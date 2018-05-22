@@ -34,14 +34,15 @@ enum PINs
     PIN12,  PIN13,  PIN14,  PIN15
 };
 
-#define AMP_ON      GPIOB->BSRR |= GPIO_BSRR_BR3
-#define AMP_OFF     GPIOB->BSRR |= GPIO_BSRR_BS3
 
-#define BT_ON       GPIOC->BSRR |= GPIO_BSRR_BS13
-#define BT_OFF      GPIOC->BSRR |= GPIO_BSRR_BR13
+#define AMP_ON      GPIOB->BSRR |= GPIO_BSRR_BR6
+#define AMP_OFF     GPIOB->BSRR |= GPIO_BSRR_BS6
 
-#define BULB_CH_ON  GPIOB->BSRR |= GPIO_BSRR_BS6
-#define BULB_CH_OFF GPIOB->BSRR |= GPIO_BSRR_BR6
+#define BT_ON       GPIOB->BSRR |= GPIO_BSRR_BS14
+#define BT_OFF      GPIOB->BSRR |= GPIO_BSRR_BR14
+
+#define BULB_CH_ON  GPIOA->BSRR |= GPIO_BSRR_BS8
+#define BULB_CH_OFF GPIOA->BSRR |= GPIO_BSRR_BR8
 
 #define BT_SOUCE     GPIOA->IDR & GPIO_PIN_10 //BT1 <-> Source/onoff
 #define BT_PREV      GPIOA->IDR & GPIO_PIN_11 //BT2 <-> PREV
@@ -50,11 +51,15 @@ enum PINs
 #define BT_VOL_UP    GPIOC->IDR & GPIO_PIN_10 //BT5 <-> VOL+
 #define BT_VOL_DOWN  GPIOC->IDR & GPIO_PIN_11 //BT6 <-> VOL-
 
-#define BT_ENC_A     GPIOB->IDR & GPIO_PIN_5 //ENC_A <-> Pref
-#define BT_ENC_B     GPIOB->IDR & GPIO_PIN_4 //ENC_B <-> Reserved
+#define BT_ENC_A     GPIOB->IDR & GPIO_PIN_4 //ENC_A <-> Pref
+#define BT_ENC_B     GPIOB->IDR & GPIO_PIN_5 //ENC_B <-> Reserved
+#define BT_ENC       GPIOB->IDR & GPIO_PIN_6 //ENC_B <-> 
 
-#define BT_CLK_DOWN GPIOA->IDR & GPIO_PIN_8  //Clock DOWN
-#define BT_CLK_UP   GPIOA->IDR & GPIO_PIN_9  //Clock UP
+#define BT_CLK_DOWN     GPIOA->IDR & GPIO_PIN_8  //Clock DOWN
+#define BT_CLK_UP       GPIOA->IDR & GPIO_PIN_9  //Clock UP
+
+#define LED1_ON         GPIOC->BSRR |= GPIO_BSRR_BS4
+#define LED1_OFF        GPIOC->BSRR |= GPIO_BSRR_BR4
 
 
 enum STATEs
