@@ -7,6 +7,7 @@
 #include "stm32f4xx_hal_tim.h"
 #include "string.h"
 #include "math.h"
+#include "RTC.h"
 
 #define F_CPU       168000000UL
 #define AHB1        F_CPU
@@ -61,6 +62,8 @@ enum PINs
 #define LED1_ON         GPIOC->BSRR |= GPIO_BSRR_BS4
 #define LED1_OFF        GPIOC->BSRR |= GPIO_BSRR_BR4
 
+#define LED2_ON         GPIOC->BSRR |= GPIO_BSRR_BS5
+#define LED2_OFF        GPIOC->BSRR |= GPIO_BSRR_BR5
 
 enum STATEs
 {
@@ -133,7 +136,7 @@ enum TDA_SET_SATT_STATES
 
 /*--------------------------------------------------------------------------------*/
 //TDA Defs
-#define TDA7419_ADDRESS		0x88
+#define TDA7718_Adr		0x88
 #define TDA_MAIN_SOURCE		0x00
 #define TDA_SOURCE_MUTE		0x07
 

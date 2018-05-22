@@ -1,9 +1,9 @@
 #include "main.h"
 
-#define DEBUG 1
-#define DEBUG_BT 1
+#define DEBUG //RELEASE
+//#define DEBUG_BT
 
-#if DEBUG_BT
+#ifdef DEBUG_BT
 
 void UART5_IRQHandler(void)
 {
@@ -22,16 +22,97 @@ void USART3_IRQHandler(void)
 
 
 
+
+
+uint8_t BT_Status = BT_NO_DEV;
+uint8_t bt_rx_buff[BT_RX_BUFF_SIZE];
+
+uint8_t I2C_res, USB_res;
+
 int main(void)
 {
     Init_RCC();
 
     Init_GPIO();
     
+    AMP_OFF;
+    BT_ON;
+    BULB_CH_ON;
+
+    FLASH->KEYR = 0x45670123;
+    FLASH->KEYR = 0xCDEF89AB;
+    
     Init_TFT();
+    TFT_send(TFT_reset,sizeof(TFT_reset)); //RESET TFT
+    
+    for(uint32_t delay = 0;delay < 10000000;delay++){}; // delay for TFT start
+
+    loading_txt[8] = '1';
+    loading_txt[9] = '4';
+    TFT_send(loading_txt, sizeof(loading_txt));
+        
+    Init_RTC();
+
+    Init_I2C1(); 
+
+    uint8_t I2C_buff[2] = {0x00, 0x00};
+    
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 4;
+    I2C_buff[1] = 0x1F;
+    I2C_res= I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+
+    I2C_buff[0] = 7;
+    I2C_buff[1] = 0x1F;
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 8;
+    I2C_buff[1] = 0x40;
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+
+    I2C_buff[0] = 9;
+    I2C_buff[1] = 0x0F;
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+
+    I2C_buff[0] = 10;
+    I2C_buff[1] = 0x10;
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 11;
+    I2C_buff[1] = 0x00;
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 12;
+    I2C_buff[1] = 0x2D;
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 13;
+    I2C_buff[1] = 0x00;
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 14;
+    I2C_buff[1] = 0x00;
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 15;
+    I2C_buff[1] = 0x00;
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+
+    I2C_buff[0] = 16;
+    I2C_buff[1] = 0x00;
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 17;
+    I2C_buff[1] = 0x00;
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 18;
+    I2C_buff[1] = 0x00;
+    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
 
 
-
+    //I2C_res = TEA_set_freq(1028); // Init FM
     Init_BT();
     
     
@@ -59,11 +140,11 @@ void Init_RCC(void)
     
     if( (RCC->CR & RCC_CR_HSIRDY) != RESET)
     {
-        /* ???????? ????? ??????????? FLASH */
+        /* Включаем буфер предвыборки FLASH */
         FLASH->ACR |= FLASH_ACR_PRFTEN;
 
-        /* ????????????? Flash ?? 2 ????? ???????? */
-    	/* ??? ????? ??????, ??? Flash ?? ????? ???????? ?? ??????? ??????? */        
+        /* Конфигурируем Flash на 2 цикла ожидания */
+    	/* Это нужно потому, что Flash не может работать на высокой частоте */        
         FLASH->ACR &= (uint32_t)((uint32_t)~FLASH_ACR_LATENCY);
         FLASH->ACR |= (uint32_t)FLASH_ACR_LATENCY_5WS;   
         
@@ -115,7 +196,7 @@ void SysTick_Handler(void)
     {
         del = 0;
         
-#if DEBUG
+#ifdef DEBUG
         if (GPIOB->ODR & GPIO_ODR_OD2)
         {
             GPIOB->BSRR |= GPIO_BSRR_BR2;
@@ -227,9 +308,31 @@ void Init_GPIO(void)
     
 }
 
+
+
+void Init_RTC(void)
+{
+    if((RCC->BDCR & RCC_BDCR_RTCEN)!=RCC_BDCR_RTCEN)//Проверка работы часов, если не включены, то инициализировать
+    {
+        RCC->APB1ENR |= RCC_APB1ENR_PWREN;//Включить тактирование PWR и Backup
+        PWR->CR |= PWR_CR_DBP; //Разрешить доступ к Backup области
+        
+        RCC->BDCR |= RCC_BDCR_BDRST;//Сбросить Backup область
+        RCC->BDCR &= ~RCC_BDCR_BDRST;
+       
+        RCC->BDCR |= RCC_BDCR_RTCEN | 
+                     RCC_BDCR_RTCSEL_0;        //Выбрать LSE источник (кварц 32768) и подать тактирование
+        
+        RCC->BDCR |= RCC_BDCR_LSEON;//Включить LSE
+        while ((RCC->BDCR & RCC_BDCR_LSEON) != RCC_BDCR_LSEON){} //Дождаться включения
+    
+        PWR->CR &= ~PWR_CR_DBP;//запретить доступ к Backup области
+    }
+}
+
 void Init_TFT(void)
 {
-#if DEBUG_BT
+#ifdef DEBUG_BT
 
     RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
     USART3->BRR = APB1/921600;
@@ -240,7 +343,7 @@ void Init_TFT(void)
    
     NVIC_EnableIRQ(USART3_IRQn);
 #else
-        //UART3 to TFT
+    //UART3 to TFT
     RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
     USART3->BRR = APB1/115200;
     USART3->CR1 = USART_CR1_UE |
@@ -258,9 +361,25 @@ void Init_TFT(void)
 
 }
 
+void TFT_send(uint8_t *buff, uint8_t size)
+{
+    LED2_ON;
+    while(DMA1_Stream3->NDTR != 0){};
+        
+    DMA1_Stream3->M0AR = (uint32_t) buff;
+    DMA1_Stream3->NDTR = size;
+    DMA1->LIFCR = DMA_LIFCR_CTCIF3 |
+                  DMA_LIFCR_CHTIF3 | 
+                  DMA_LIFCR_CFEIF3 |
+                  DMA_LIFCR_CTEIF3;
+    DMA1_Stream3->CR |= DMA_SxCR_EN;
+      
+    LED2_OFF;
+}
+
 void Init_BT(void)
 {
-#if DEBUG_BT
+#ifdef DEBUG_BT
     RCC->APB1ENR |= RCC_APB1ENR_UART5EN;
     UART5->BRR = APB1/921600;
     UART5->CR1 = USART_CR1_UE | 
@@ -308,3 +427,120 @@ void Init_BT(void)
 #endif
 }
 
+void BT_send(uint8_t query)
+{
+    DMA1->HIFCR = DMA_HIFCR_CTCIF7 |
+                  DMA_HIFCR_CHTIF7 | 
+                  DMA_HIFCR_CFEIF7 |
+                  DMA_HIFCR_CTEIF7;	
+        
+    DMA1_Stream7->M0AR = (uint32_t) bt_tx_query[query];
+    DMA1_Stream7->NDTR = 7;
+    DMA1_Stream7->CR |= DMA_SxCR_EN;
+}
+
+void DMA1_Stream0_IRQHandler(void)
+{
+	DMA1->LIFCR = DMA_LIFCR_CTCIF0 |
+                  DMA_LIFCR_CHTIF0 | 
+                  DMA_LIFCR_CFEIF0 |
+                  DMA_LIFCR_CTEIF0 |
+				  DMA_LIFCR_CDMEIF0;
+	
+	DMA1_Stream0->M0AR = (uint32_t) bt_rx_buff;
+	DMA1_Stream0->NDTR = BT_RX_BUFF_SIZE;
+	DMA1_Stream0->CR |= DMA_SxCR_EN;
+    
+    if((bt_rx_buff[0] == 13)&&(bt_rx_buff[1] == 10))
+	{
+        switch(bt_rx_buff[3])
+        {
+            case 'I':{
+                        BT_Status = BT_NO_DEV;
+                    break;}
+            case 'U':{
+                        if(bt_rx_buff[4] == '1')
+                            BT_Status = BT_NO_DEV;
+                        else if(((bt_rx_buff[4] == '3')||(bt_rx_buff[4] == '5'))&&(BT_Status == BT_NO_DEV))
+                            BT_Status = BT_CONN;
+                    break;}
+            case 'P':{
+                        if (BT_Status == BT_PLAY)
+                            BT_Status = BT_PAUSE;
+                    break;}
+            case 'R':{
+                        BT_Status = BT_PLAY;
+                    break;}
+        
+        };
+//        if ((STATE == MAIN) && (INPUT_SEL == BT))
+//            TFT_send(main_BT_text[BT_Status],sizeof(main_BT_text[BT_Status]));
+    }
+}
+void Init_I2C1(void)
+{
+    //I2C1 Init
+    RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
+    I2C1->CR2 = 45 << I2C_CR2_FREQ_Pos;// |
+    I2C1->CCR = APB1/200000;
+    I2C1->TRISE = APB1/1000000+1;
+    I2C1->CR1 = I2C_CR1_PE;
+}
+
+uint8_t I2C1_Send(uint8_t addres,uint8_t *buff, uint16_t size)
+{
+    uint16_t i;
+    
+    I2C1->CR1 |= I2C_CR1_START;             // формирование сигнала старт
+        
+    while (!(I2C1->SR1 & I2C_SR1_SB))       // ждем окончания формирования сигнала "Старт"
+    {
+        if(I2C1->SR1 & I2C_SR1_BERR)
+        return 1;
+    }
+    (void) I2C1->SR1;(void) I2C1->SR2;
+
+    I2C1->DR = addres;                        // Передаем адресс
+    
+    while (!(I2C1->SR1 & I2C_SR1_ADDR))     // ожидаем окончания передачи адреса
+    {
+        if((I2C1->SR1 & I2C_SR1_BERR) || (I2C1->SR1 & I2C_SR1_AF))
+        {
+            I2C1->CR1 |= I2C_CR1_STOP;
+            return 2;
+        }
+    }
+    (void) I2C1->SR1;(void) I2C1->SR2;
+
+    for(i=0;i<size;i++)
+    {
+        I2C1->DR = buff[i];
+        while (!(I2C1->SR1 & I2C_SR1_BTF))  // ожидаем окончания передачи
+        {
+            if((I2C1->SR1 & I2C_SR1_BERR) || (I2C1->SR1 & I2C_SR1_AF))
+            {   
+                I2C1->CR1 |= I2C_CR1_STOP;
+                return 3;
+            }
+        }
+        (void) I2C1->SR1;(void) I2C1->SR2;
+    }
+    
+    I2C1->CR1 |= I2C_CR1_STOP;              // формирование сигнала "Стоп"
+    return 0;
+}
+
+uint8_t TEA_set_freq(uint16_t freq)
+{
+    uint8_t tea[5];
+    
+	freq = (4*(freq*100000UL+225000UL))/32768;
+    
+	tea[0] = freq >> 8;
+    tea[1] = freq & 0xff;
+    
+    tea[2] = 0x10;
+    tea[3] = 0x12;
+    tea[4] = 0;//high ingection
+    return I2C1_Send(0xC0, tea,sizeof(tea));
+}
