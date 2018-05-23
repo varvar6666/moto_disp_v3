@@ -7,8 +7,15 @@
 #include "stm32f4xx_hal_tim.h"
 #include "string.h"
 #include "math.h"
-#include "RTC.h"
 
+/*-------------------------------------------------------*/
+/*                  Copmilator defs                      */
+#define DEBUG //RELEASE
+//#define DEBUG_BT
+
+
+/*-------------------------------------------------------*/
+/*                  Global DEFINEs                       */
 #define F_CPU       168000000UL
 #define AHB1        F_CPU
 #define APB1        F_CPU/4
@@ -18,6 +25,8 @@
 #define SysTicksClk 10000
 #define SysTicks    F_CPU/SysTicksClk
 
+/*-------------------------------------------------------*/
+/*                  Memory Addresses                     */
 #define	MEM_ADDRESS 		0x0800C000
 #define RADIO_FREQ_ADR	    MEM_ADDRESS + 0x04
 #define TDA_MAIN_LOUD_ADR	MEM_ADDRESS + 0x10
@@ -25,7 +34,6 @@
 #define TDA_MIDD_ADR	    MEM_ADDRESS + 0x18
 #define TDA_BASS_ADR	    MEM_ADDRESS + 0x1C
 #define TDA_SATT_ADR	    MEM_ADDRESS + 0x20
-
 
 enum PINs
 {
@@ -35,26 +43,27 @@ enum PINs
     PIN12,  PIN13,  PIN14,  PIN15
 };
 
+/*-------------------------------------------------------*/
+/*                  GPIO DEFINEs                         */
+#define AMP_ON          GPIOB->BSRR |= GPIO_BSRR_BR6
+#define AMP_OFF         GPIOB->BSRR |= GPIO_BSRR_BS6
 
-#define AMP_ON      GPIOB->BSRR |= GPIO_BSRR_BR6
-#define AMP_OFF     GPIOB->BSRR |= GPIO_BSRR_BS6
+#define BT_ON           GPIOB->BSRR |= GPIO_BSRR_BS14
+#define BT_OFF          GPIOB->BSRR |= GPIO_BSRR_BR14
 
-#define BT_ON       GPIOB->BSRR |= GPIO_BSRR_BS14
-#define BT_OFF      GPIOB->BSRR |= GPIO_BSRR_BR14
+#define BULB_CH_ON      GPIOA->BSRR |= GPIO_BSRR_BS8
+#define BULB_CH_OFF     GPIOA->BSRR |= GPIO_BSRR_BR8
 
-#define BULB_CH_ON  GPIOA->BSRR |= GPIO_BSRR_BS8
-#define BULB_CH_OFF GPIOA->BSRR |= GPIO_BSRR_BR8
+#define BT_SOUCE        GPIOA->IDR & GPIO_PIN_10 //BT1 <-> Source/onoff
+#define BT_PREV         GPIOA->IDR & GPIO_PIN_11 //BT2 <-> PREV
+#define BT_NEXT         GPIOA->IDR & GPIO_PIN_12 //BT3 <-> NEXT
+#define BT_PP           GPIOA->IDR & GPIO_PIN_15 //BT4 <-> Play/payse 
+#define BT_VOL_UP       GPIOC->IDR & GPIO_PIN_10 //BT5 <-> VOL+
+#define BT_VOL_DOWN     GPIOC->IDR & GPIO_PIN_11 //BT6 <-> VOL-
 
-#define BT_SOUCE     GPIOA->IDR & GPIO_PIN_10 //BT1 <-> Source/onoff
-#define BT_PREV      GPIOA->IDR & GPIO_PIN_11 //BT2 <-> PREV
-#define BT_NEXT      GPIOA->IDR & GPIO_PIN_12 //BT3 <-> NEXT
-#define BT_PP        GPIOA->IDR & GPIO_PIN_15 //BT4 <-> Play/payse 
-#define BT_VOL_UP    GPIOC->IDR & GPIO_PIN_10 //BT5 <-> VOL+
-#define BT_VOL_DOWN  GPIOC->IDR & GPIO_PIN_11 //BT6 <-> VOL-
-
-#define BT_ENC_A     GPIOB->IDR & GPIO_PIN_4 //ENC_A <-> Pref
-#define BT_ENC_B     GPIOB->IDR & GPIO_PIN_5 //ENC_B <-> Reserved
-#define BT_ENC       GPIOB->IDR & GPIO_PIN_6 //ENC_B <-> 
+#define BT_ENC_A        GPIOB->IDR & GPIO_PIN_4 //ENC_A <-> Pref
+#define BT_ENC_B        GPIOB->IDR & GPIO_PIN_5 //ENC_B <-> Reserved
+#define BT_ENC          GPIOB->IDR & GPIO_PIN_6 //ENC_B <-> Reserved
 
 #define BT_CLK_DOWN     GPIOA->IDR & GPIO_PIN_8  //Clock DOWN
 #define BT_CLK_UP       GPIOA->IDR & GPIO_PIN_9  //Clock UP
@@ -65,6 +74,14 @@ enum PINs
 #define LED2_ON         GPIOC->BSRR |= GPIO_BSRR_BS5
 #define LED2_OFF        GPIOC->BSRR |= GPIO_BSRR_BR5
 
+#define LED3_ON         GPIOB->BSRR |= GPIO_BSRR_BS0
+#define LED3_OFF        GPIOB->BSRR |= GPIO_BSRR_BR0
+
+#define LED4_ON         GPIOB->BSRR |= GPIO_BSRR_BS1
+#define LED4_OFF        GPIOB->BSRR |= GPIO_BSRR_BR1
+
+/*-------------------------------------------------------*/
+/*                  Global states                        */
 enum STATEs
 {
     LOAD=0,
@@ -74,6 +91,15 @@ enum STATEs
     TDA_SETT
 };
 
+#ifdef DEBUG
+uint8_t STATE = AUDIO_OFF;
+#else
+uint8_t STATE = BT;
+#endif
+uint8_t prev_state;
+
+/*-------------------------------------------------------*/
+/*                  RTC set states                       */
 enum SET_TIME_STATEs
 {
     SET_TIME_HOUR=0,
@@ -85,6 +111,10 @@ enum SET_TIME_STATEs
     SET_SET
 };
 
+uint8_t SET_TIME_STATE = SET_TIME_HOUR;
+
+/*-------------------------------------------------------*/
+/*                  Input selector                       */
 enum INPUTs
 {
     FM=0,
@@ -93,6 +123,10 @@ enum INPUTs
     AUX
 };
 
+uint8_t INPUT_SEL = FM;
+
+/*-------------------------------------------------------*/
+/*                  TODO: remake TDA config                 */
 enum TDA_SET_STATEs
 {
     TDA_SET_LOUDNESS=0,
@@ -134,9 +168,9 @@ enum TDA_SET_SATT_STATES
 };
 
 
-/*--------------------------------------------------------------------------------*/
-//TDA Defs
-#define TDA7718_Adr		0x88
+/*-------------------------------------------------------*/
+/*                  TDA Defines TODO: CHECK                         */
+#define TDA7718_ADDRESS	    0x88
 #define TDA_MAIN_SOURCE		0x00
 #define TDA_SOURCE_MUTE		0x07
 
@@ -156,13 +190,13 @@ enum TDA_SET_SATT_STATES
 #define TDA_SPEAKER_ATT_LR  0x0C
 #define TDA_SPEAKER_ATT_RR  0x0D
 
-//const uint8_t TDA_inputs[4] = {0x82, 0x84, 0x81, 0x83};
-const uint8_t TDA_inputs[4] = {0xFA, 0xF9, 0xFC, 0xFB};
+//                             FM,   BT,   USB,  AUX
+const uint8_t TDA_inputs[4] = {0x04, 0x01, 0x05, 0x00};
 
 
 
-/*--------------------------------------------------------------------------------*/
-//TFT commands
+/*-------------------------------------------------------*/
+/*                  TFT strings                          */
 uint8_t TFT_reset[7] = {'r','e','s','t',255,255,255};
 
 uint8_t loading_txt[13] = {'l','o','d','.','v','a','l','=','0','0',255,255,255};
@@ -267,8 +301,8 @@ uint8_t tda_set_satt_val[64] = {'l','_','f','.','t','x','t','=','"','-','7','9',
 
 
 																 
-/*--------------------------------------------------------------------------------*/
-// BT
+/*-------------------------------------------------------*/
+/*                  BlueTooth                            */
 #define BT_RX_BUFF_SIZE 20
 
 enum BT_querys
@@ -292,8 +326,11 @@ enum BT_Statuses
     BT_PAUSE
 };
 
-/*--------------------------------------------------------------------------------*/
+uint8_t BT_Status = BT_NO_DEV;
+uint8_t bt_rx_buff[BT_RX_BUFF_SIZE];
 
+/*-------------------------------------------------------*/
+/*                  USB MP3 TODO: remake                     */
 #define USB_CMD_NEXT        0x01
 #define USB_CMD_PREV        0x02
 #define USB_CMD_VOL         0x06
@@ -322,20 +359,31 @@ enum USB_Statuses
 uint8_t USB_command[4]  = {0x7E, 0x02, 0, 0xEF};
 uint8_t USB_command5[5] = {0x7E, 0x03, 0, 0, 0xEF};
 
-/*--------------------------------------------------------------------------------*/
-//ADC
+uint8_t usb_rx_buff[11];
+uint8_t usb_status = USB_PAUSE;
+uint8_t usb_play_mode  = 0;
+
+/*-------------------------------------------------------*/
+/*                  ADC BUFFER                           */
 #define ADC_BUF_NUM 2
-/*--------------------------------------------------------------------------------*/
-void TIM8_TRG_COM_TIM14_IRQHandler(void);
+
+uint16_t ADC_Buff[ADC_BUF_NUM];
+
+/*-------------------------------------------------------*/
+/*                  Global functions prototypes          */
+/*--                Interrupts Handlers                --*/
+void TIM8_TRG_COM_TIM14_IRQHandler(void);       //Buuton parse timer interrupt
 //void DMA1_Stream2_IRQHandler(void);
 void DMA1_Stream0_IRQHandler(void);
 void DMA2_Stream0_IRQHandler(void);
 void UART5_IRQHandler(void);
 //void UART4_IRQHandler(void);
-                                
+
+/*--                Clock Inits                        --*/
 void Init_RCC(void);
 void SysTick_Handler(void);
 
+/*--                Flash                              --*/
 uint32_t flash_read(uint32_t address);
 uint8_t flash_ready(void);
 void flash_erase_sector(uint8_t sector);

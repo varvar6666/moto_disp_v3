@@ -1,8 +1,5 @@
 #include "main.h"
 
-#define DEBUG //RELEASE
-//#define DEBUG_BT
-
 #ifdef DEBUG_BT
 
 void UART5_IRQHandler(void)
@@ -19,15 +16,15 @@ void USART3_IRQHandler(void)
         
 #endif
 
-
-
-
-
-
-uint8_t BT_Status = BT_NO_DEV;
-uint8_t bt_rx_buff[BT_RX_BUFF_SIZE];
+uint8_t OFF_counter = 0;
 
 uint8_t I2C_res, USB_res;
+
+uint16_t RADIO_FREQ = 1040;
+
+int8_t VOLUME = 0;
+
+uint8_t MUTED = 0;
 
 int main(void)
 {
@@ -55,65 +52,10 @@ int main(void)
 
     Init_I2C1(); 
 
-    uint8_t I2C_buff[2] = {0x00, 0x00};
-    
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-    
-    I2C_buff[0] = 4;
-    I2C_buff[1] = 0x1F;
-    I2C_res= I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-
-    I2C_buff[0] = 7;
-    I2C_buff[1] = 0x1F;
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-    
-    I2C_buff[0] = 8;
-    I2C_buff[1] = 0x40;
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-
-    I2C_buff[0] = 9;
-    I2C_buff[1] = 0x0F;
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-
-    I2C_buff[0] = 10;
-    I2C_buff[1] = 0x10;
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-    
-    I2C_buff[0] = 11;
-    I2C_buff[1] = 0x00;
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-    
-    I2C_buff[0] = 12;
-    I2C_buff[1] = 0x2D;
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-    
-    I2C_buff[0] = 13;
-    I2C_buff[1] = 0x00;
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-    
-    I2C_buff[0] = 14;
-    I2C_buff[1] = 0x00;
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-    
-    I2C_buff[0] = 15;
-    I2C_buff[1] = 0x00;
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-
-    I2C_buff[0] = 16;
-    I2C_buff[1] = 0x00;
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-    
-    I2C_buff[0] = 17;
-    I2C_buff[1] = 0x00;
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-    
-    I2C_buff[0] = 18;
-    I2C_buff[1] = 0x00;
-    I2C_res = I2C1_Send(TDA7718_Adr, I2C_buff, sizeof(I2C_buff));
-
-
-    //I2C_res = TEA_set_freq(1028); // Init FM
-    Init_BT();
+    Init_TDA();
+        
+    I2C_res = TEA_set_freq(1040); // Init FM
+    //Init_BT();
     
     
     
@@ -358,7 +300,6 @@ void Init_TFT(void)
     DMA1_Stream3->PAR = (uint32_t) &USART3->DR;
     
 #endif
-
 }
 
 void TFT_send(uint8_t *buff, uint8_t size)
@@ -543,4 +484,79 @@ uint8_t TEA_set_freq(uint16_t freq)
     tea[3] = 0x12;
     tea[4] = 0;//high ingection
     return I2C1_Send(0xC0, tea,sizeof(tea));
+}
+
+uint8_t Init_TDA(void)
+{
+//	init_buff[1] = (STATE == MAIN) ? TDA_inputs[INPUT_SEL] : TDA_SOURCE_MUTE; // Main source = SE2(FM), gain = 0;
+//    init_buff[2] = (TDA_loudness.atteniation & 0xF)|((TDA_loudness.center_freq << 4) & 0x30)| ((TDA_loudness.high_boost << 6) & 0x40); // Loudless
+//    init_buff[3] = 0xC7; // CLK FM off, SM step 2.56, 0.96, I2C, off
+//    init_buff[4] = VOLUME > 0 ? VOLUME : 16-VOLUME; // VOLUME
+//    init_buff[5] = 0x80 | ((TDA_treble.center_freq << 5)&0x60) | (TDA_treble.atteniation > 0 ? (TDA_treble.atteniation | 0x10):(abs(TDA_treble.atteniation))); // Ref out ext + treble off;
+//    init_buff[6] = ((TDA_middle.Q_factot << 5) & 0x60) | ((TDA_middle.atteniation > 0 ? (TDA_middle.atteniation | 0x10):(abs(TDA_middle.atteniation))) & 0x1F); // mid off
+//    init_buff[7] = ((TDA_bass.Q_factot << 5) & 0x60) | ((TDA_bass.atteniation > 0 ? (TDA_bass.atteniation | 0x10):(abs(TDA_bass.atteniation))) & 0x1F); // bass off
+//    init_buff[9] = ((TDA_bass.center_freq << 4) & 0x30) | ((TDA_middle.center_freq << 2) & 0xC); // sub off all
+//    init_buff[11]= TDA_sp_att.left_front  > 0 ? TDA_sp_att.left_front  : 16-TDA_sp_att.left_front; //Lefr  Front
+//    init_buff[12]= TDA_sp_att.right_front > 0 ? TDA_sp_att.right_front : 16-TDA_sp_att.right_front;//Right Front
+//    init_buff[13]= TDA_sp_att.left_rear   > 0 ? TDA_sp_att.left_rear   : 16-TDA_sp_att.left_rear;  //Lefr  Rear
+//    init_buff[14]= TDA_sp_att.right_rear  > 0 ? TDA_sp_att.right_rear  : 16-TDA_sp_att.right_rear; //Right Rear
+
+    uint8_t I2C_buff[2], res;
+    I2C_buff[0] = 0x00;         //Addr  0: Main Selector
+    I2C_buff[1] = TDA_inputs[BT];
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 4;            //Addr  4: Soft mute - OFF
+    I2C_buff[1] = 0x1F;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+
+    I2C_buff[0] = 7;            //Addr  7: Loudness
+    I2C_buff[1] = 0x00;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 8;            //Addr  8: Volume/Output gain
+    I2C_buff[1] = 0x00;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+
+    I2C_buff[0] = 9;            //Addr  9: Treble filter
+    I2C_buff[1] = 0x0F;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+
+    I2C_buff[0] = 10;           //Addr 10: Middle filter
+    I2C_buff[1] = 0x0F;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+
+    I2C_buff[0] = 11;           //Addr 11: Bass filter
+    I2C_buff[1] = 0x0F;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 12;           //Addr 12: Subwoofer/middle/bass
+    I2C_buff[1] = 0x00;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 13;           //Addr 13: Speaker attenuation Front Lefr
+    I2C_buff[1] = 0x00;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 14;           //Addr 14: Speaker attenuation Front Right
+    I2C_buff[1] = 0x00;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 15;           //Addr 15: Speaker attenuation Rear Lefr
+    I2C_buff[1] = 0x00;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+
+    I2C_buff[0] = 16;           //Addr 16: Speaker attenuation Rear Right
+    I2C_buff[1] = 0x00;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 17;           //Addr 17: Speaker attenuation SW Lefr
+    I2C_buff[1] = 0x00;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    
+    I2C_buff[0] = 18;           //Addr 18: Speaker attenuation SW Right
+    I2C_buff[1] = 0x00;
+    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+   
+    return res;
 }
