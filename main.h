@@ -82,21 +82,17 @@ enum PINs
 
 /*-------------------------------------------------------*/
 /*                  Global states                        */
-enum STATEs
+enum GLOBAL_STATEs
 {
-    LOAD=0,
-	AUDIO_OFF,
-    MAIN,
-    SET_TIME,
-    TDA_SETT
+    GLOBAL_STATE_LOAD=0,
+	GLOBAL_STATE_AUDIO_OFF,
+    GLOBAL_STATE_MAIN,
+    GLOBAL_STATE_SET_TIME,
+    GLOBAL_STATE_TDA_SETT
 };
 
-#ifdef DEBUG
-uint8_t STATE = AUDIO_OFF;
-#else
-uint8_t STATE = BT;
-#endif
-uint8_t prev_state;
+uint8_t GLOBAL_STATE;
+uint8_t PREVIOS_STATE;
 
 /*-------------------------------------------------------*/
 /*                  RTC set states                       */
@@ -115,15 +111,15 @@ uint8_t SET_TIME_STATE = SET_TIME_HOUR;
 
 /*-------------------------------------------------------*/
 /*                  Input selector                       */
-enum INPUTs
+enum AUDIO_INPUTs
 {
-    FM=0,
-    BT,
-    USB,
-    AUX
+    AUDIO_FM=0,
+    AUDIO_BT,
+    AUDIO_USB,
+    AUDIO_AUX
 };
 
-uint8_t INPUT_SEL = FM;
+uint8_t AUDIO_INPUT;
 
 /*-------------------------------------------------------*/
 /*                  TODO: remake TDA config                 */
@@ -205,13 +201,11 @@ uint8_t TFT_TIME[56] = {'t','i','m','e','.','t','x','t','=','"',0,0,':',0,0,'"',
                         'd','a','t','e','.','t','x','t','=','"',' ',' ',0,0,'.',0,0,'.',0,0,' ',\
 						' ',' ',' ','d','a','y','o','f','w','e','e','k','"',255,255,255}; 
 
-uint8_t pages[4][16] = {{'p','a','g','e',' ','l','o','a','d',255,255,255},
+uint8_t pages[4][12] = {{'p','a','g','e',' ','l','o','a','d',255,255,255},
                         {'p','a','g','e',' ','a','o','f','f',255,255,255},
                         {'p','a','g','e',' ','m','a','i','n',255,255,255},
                         {'p','a','g','e',' ','s','e','t','t',255,255,255}};
 
-uint8_t tft_apage[12] = {'v','a','0','.','v','a','l','=','1',255,255,255};
-                                
 uint8_t input_tft[4][32] = {{'i','n','p','.','t','x','t','=','"','F','M','"',255,255,255,'i','n','p','.','b','c','o','=','0','3','4','8','1','5',255,255,255},
                             {'i','n','p','.','t','x','t','=','"','B','T','"',255,255,255,'i','n','p','.','b','c','o','=','0','1','4','8','4','7',255,255,255},
                             {'i','n','p','.','t','x','t','=','"','U','S','B','"',255,255,255,'i','n','p','.','b','c','o','=','6','3','4','8','8',255,255,255},
@@ -356,6 +350,15 @@ enum USB_Statuses
     USB_PAUSE
 };
 
+struct TRACK_INFO
+{
+    uint16_t count;
+    uint16_t num;
+    uint16_t time;
+    uint16_t tlong;
+    uint8_t  name[11];
+} usb_track_info;
+
 uint8_t USB_command[4]  = {0x7E, 0x02, 0, 0xEF};
 uint8_t USB_command5[5] = {0x7E, 0x03, 0, 0, 0xEF};
 
@@ -372,11 +375,10 @@ uint16_t ADC_Buff[ADC_BUF_NUM];
 /*-------------------------------------------------------*/
 /*                  Global functions prototypes          */
 /*--                Interrupts Handlers                --*/
-void TIM8_TRG_COM_TIM14_IRQHandler(void);       //Buuton parse timer interrupt
+//void TIM8_TRG_COM_TIM14_IRQHandler(void);         //Button parse timer interrupt
 //void DMA1_Stream2_IRQHandler(void);
-void DMA1_Stream0_IRQHandler(void);
-void DMA2_Stream0_IRQHandler(void);
-void UART5_IRQHandler(void);
+//void DMA2_Stream0_IRQHandler(void);
+void UART5_IRQHandler(void);                        //Recive information from BT
 //void UART4_IRQHandler(void);
 
 /*--                Clock Inits                        --*/

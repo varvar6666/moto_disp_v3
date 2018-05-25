@@ -28,35 +28,90 @@ uint8_t MUTED = 0;
 
 int main(void)
 {
-    Init_RCC();
+/**---------------------------------------------------------**/
+/*          Init all                                        */
+    Init_RCC();                             //Clocks
 
-    Init_GPIO();
+    Init_GPIO();                            //GPIO
     
-    AMP_OFF;
-    BT_ON;
-    BULB_CH_ON;
+    AMP_OFF;                                //Off Amplifier
+    BT_OFF;                                 //Off BlueTooth
+    BULB_CH_ON;                             //Start check bulbs
 
-    FLASH->KEYR = 0x45670123;
+    FLASH->KEYR = 0x45670123;               //Enable access to FLASH
     FLASH->KEYR = 0xCDEF89AB;
     
-    Init_TFT();
-    TFT_send(TFT_reset,sizeof(TFT_reset)); //RESET TFT
+    Init_TFT();                             //TFT
+    TFT_send(TFT_reset,sizeof(TFT_reset));  //TFT reset to clear
     
     for(uint32_t delay = 0;delay < 10000000;delay++){}; // delay for TFT start
 
     loading_txt[8] = '1';
     loading_txt[9] = '4';
-    TFT_send(loading_txt, sizeof(loading_txt));
+    TFT_send(loading_txt, sizeof(loading_txt)); //Add information for loading start
         
-    Init_RTC();
+    Init_RTC();                             //Real-Time-Clock
 
-    Init_I2C1(); 
-
-    Init_TDA();
+    Init_BT();                              //Bluetooth
         
-    I2C_res = TEA_set_freq(1040); // Init FM
-    //Init_BT();
+    Init_USB();                             //MP3 player
     
+    USB_res = USB_send_par(USB_CMD_SOURCE, 0x00);
+    if(USB_res == 0)
+    {
+        USB_res = USB_send_par(USB_CMD_VOL, 0x1e);
+        USB_res = USB_send_par(USB_CMD_PLAY_MODE, 0x00);
+    }
+    
+    Init_I2C1();                            //I2C for TDA & TEA
+        
+    uint32_t tmp_mem;
+    //STATE = AUDIO_OFF;
+    tmp_mem = flash_read(MEM_ADDRESS);
+    if(tmp_mem != 0xFFFFFFFF) //TODO: add check
+    {
+        GLOBAL_STATE = (0xFF000000 & tmp_mem) >> 24;
+        AUDIO_INPUT = (0xFF0000 & flash_read(MEM_ADDRESS)) >> 16;
+        VOLUME = (0xFF00 & flash_read(MEM_ADDRESS)) >> 8;
+        
+        tmp_mem = flash_read(RADIO_FREQ_ADR);
+        RADIO_FREQ = (0xFFFF0000 & tmp_mem) >> 16;
+        
+//        tmp_mem = flash_read(TDA_MAIN_LOUD_ADR);
+//        TDA_loudness.high_boost  = (0xFF000000 & tmp_mem) >> 24;
+//        TDA_loudness.center_freq = (0xFF0000   & tmp_mem) >> 16;
+//        TDA_loudness.atteniation = (0xFF00     & tmp_mem) >> 8;
+//        
+//        tmp_mem = flash_read(TDA_TREB_ADR);
+//        TDA_treble.center_freq = (0xFF000000 & tmp_mem) >> 24;
+//        TDA_treble.atteniation = (0xFF0000   & tmp_mem) >> 16;
+//        
+//        tmp_mem = flash_read(TDA_MIDD_ADR);
+//        TDA_middle.Q_factot    = (0xFF000000 & tmp_mem) >> 24;
+//        TDA_middle.center_freq = (0xFF0000   & tmp_mem) >> 16;
+//        TDA_middle.atteniation = (0xFF00     & tmp_mem) >> 8;
+//        
+//        tmp_mem = flash_read(TDA_BASS_ADR);
+//        TDA_bass.Q_factot    = (0xFF000000 & tmp_mem) >> 24;
+//        TDA_bass.center_freq = (0xFF0000   & tmp_mem) >> 16;
+//        TDA_bass.atteniation = (0xFF00     & tmp_mem) >> 8;
+//        
+//        tmp_mem = flash_read(TDA_SATT_ADR);
+//        TDA_sp_att.left_front  = (0xFF000000 & tmp_mem) >> 24;
+//        TDA_sp_att.right_front = (0xFF0000   & tmp_mem) >> 16;
+//        TDA_sp_att.left_rear   = (0xFF00     & tmp_mem) >> 8;
+//        TDA_sp_att.right_rear  = (0xFF       & tmp_mem);
+    }
+    else
+    {
+        GLOBAL_STATE = GLOBAL_STATE_AUDIO_OFF;
+        AUDIO_INPUT = AUDIO_FM;
+    }
+    
+    
+    I2C_res = Init_TDA();                   //TDA
+        
+    I2C_res = TEA_set_freq(1040);           //FM
     
     
     
@@ -67,10 +122,13 @@ int main(void)
     }
 }
 
+/**=========================================================**/
+ /*------------Main clocks Init-----------------------------*/
+/**---------------------------------------------------------**/
 void Init_RCC(void)
 {
     __IO uint32_t StartUpCounter = 0, HSEStatus = 0;
-    
+    /* Enable external resonator */
     RCC->CR |= RCC_CR_HSEON;
 
     do
@@ -128,6 +186,8 @@ void Init_RCC(void)
     SysTick_Config(SysTicks);
 }
 
+ /*----------System timer interrup handler------------------*/
+/**---------------------------------------------------------**/
 void SysTick_Handler(void)
 {
     static uint32_t del = 0;
@@ -154,6 +214,9 @@ void SysTick_Handler(void)
     }
 }
 
+/**=========================================================**/
+ /*----------------GPIO Init--------------------------------*/
+/**---------------------------------------------------------**/
 void Init_GPIO(void)
 {
     RCC-> AHB1ENR |= RCC_AHB1ENR_GPIOAEN |
@@ -250,8 +313,9 @@ void Init_GPIO(void)
     
 }
 
-
-
+/**=========================================================**/
+ /*-----------------RTC Init--------------------------------*/
+/**---------------------------------------------------------**/
 void Init_RTC(void)
 {
     if((RCC->BDCR & RCC_BDCR_RTCEN)!=RCC_BDCR_RTCEN)//Проверка работы часов, если не включены, то инициализировать
@@ -272,6 +336,9 @@ void Init_RTC(void)
     }
 }
 
+/**=========================================================**/
+ /*-----------------TFT Init--------------------------------*/
+/**---------------------------------------------------------**/
 void Init_TFT(void)
 {
 #ifdef DEBUG_BT
@@ -302,6 +369,8 @@ void Init_TFT(void)
 #endif
 }
 
+ /*------------TFT send function----------------------------*/
+/**---------------------------------------------------------**/
 void TFT_send(uint8_t *buff, uint8_t size)
 {
     LED2_ON;
@@ -318,6 +387,9 @@ void TFT_send(uint8_t *buff, uint8_t size)
     LED2_OFF;
 }
 
+/**=========================================================**/
+ /*--------------BlueTooth Init-----------------------------*/
+/**---------------------------------------------------------**/
 void Init_BT(void)
 {
 #ifdef DEBUG_BT
@@ -339,20 +411,11 @@ void Init_BT(void)
     RCC->APB1ENR |= RCC_APB1ENR_UART5EN;
     UART5->BRR = APB1/921600;
     UART5->CR1 = USART_CR1_UE | 
-                 USART_CR1_TE | 
-                 USART_CR1_RE |
-				 USART_CR1_IDLEIE;
-    UART5->CR3 = USART_CR3_DMAR |
-                 USART_CR3_DMAT;
-    
-    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
-    DMA1_Stream0->CR = DMA_SxCR_MINC |
-					   DMA_SxCR_TCIE |
-                       DMA_SxCR_CHSEL_2;
-    DMA1_Stream0->PAR = (uint32_t) &UART5->DR;
-    DMA1_Stream0->M0AR = (uint32_t) bt_rx_buff;
-    DMA1_Stream0->NDTR = BT_RX_BUFF_SIZE;
-    DMA1_Stream0->CR |= DMA_SxCR_EN;
+                 USART_CR1_TE |
+                 USART_CR1_RXNEIE |
+                 USART_CR1_RE;
+    UART5->CR3 = USART_CR3_DMAT;
+
     
     DMA1_Stream7->CR &= ~DMA_SxCR_EN;
     DMA1_Stream7->CR = DMA_SxCR_DIR_0 |
@@ -362,12 +425,13 @@ void Init_BT(void)
         
     BT_ON;
     
-	NVIC_EnableIRQ(DMA1_Stream0_IRQn);
 	NVIC_EnableIRQ(UART5_IRQn);
     
 #endif
 }
 
+ /*----Send command to BlueTooth function-------------------*/
+/**---------------------------------------------------------**/
 void BT_send(uint8_t query)
 {
     DMA1->HIFCR = DMA_HIFCR_CTCIF7 |
@@ -380,44 +444,272 @@ void BT_send(uint8_t query)
     DMA1_Stream7->CR |= DMA_SxCR_EN;
 }
 
-void DMA1_Stream0_IRQHandler(void)
+ /*-----Recive information about BT from UART5 Handler------*/
+/**---------------------------------------------------------**/
+void UART5_IRQHandler(void)
 {
-	DMA1->LIFCR = DMA_LIFCR_CTCIF0 |
-                  DMA_LIFCR_CHTIF0 | 
-                  DMA_LIFCR_CFEIF0 |
-                  DMA_LIFCR_CTEIF0 |
-				  DMA_LIFCR_CDMEIF0;
-	
-	DMA1_Stream0->M0AR = (uint32_t) bt_rx_buff;
-	DMA1_Stream0->NDTR = BT_RX_BUFF_SIZE;
-	DMA1_Stream0->CR |= DMA_SxCR_EN;
-    
-    if((bt_rx_buff[0] == 13)&&(bt_rx_buff[1] == 10))
-	{
-        switch(bt_rx_buff[3])
+    uint8_t tmp = UART5->DR;
+
+    switch (tmp)
+    {
+        case 13:
         {
-            case 'I':{
-                        BT_Status = BT_NO_DEV;
-                    break;}
-            case 'U':{
-                        if(bt_rx_buff[4] == '1')
+            if(bt_rx_buff[0] == 0)
+                bt_rx_buff[0] = tmp;
+            break;
+        }
+        case 10:
+        {
+            if(bt_rx_buff[1] == 0)
+                bt_rx_buff[1] = tmp;
+            else
+            {
+                bt_rx_buff[0] = 0;
+                bt_rx_buff[1] = 0;
+                bt_rx_buff[2] = 0;
+                bt_rx_buff[3] = 0;
+                bt_rx_buff[4] = 0;
+            }
+            break;
+        }
+        default:
+        {
+            if((bt_rx_buff[0] == 13)&&(bt_rx_buff[1] == 10))
+            {
+                if(bt_rx_buff[2] == 0)
+                    bt_rx_buff[2] = tmp;
+                else
+                {
+                    if(tmp == 'U')
+                        bt_rx_buff[3] = tmp;
+                    else
+                    {
+                        if(tmp == 'I')
                             BT_Status = BT_NO_DEV;
-                        else if(((bt_rx_buff[4] == '3')||(bt_rx_buff[4] == '5'))&&(BT_Status == BT_NO_DEV))
-                            BT_Status = BT_CONN;
-                    break;}
-            case 'P':{
-                        if (BT_Status == BT_PLAY)
-                            BT_Status = BT_PAUSE;
-                    break;}
-            case 'R':{
-                        BT_Status = BT_PLAY;
-                    break;}
-        
-        };
-//        if ((STATE == MAIN) && (INPUT_SEL == BT))
-//            TFT_send(main_BT_text[BT_Status],sizeof(main_BT_text[BT_Status]));
-    }
+                        else if (tmp == 'R')
+                            BT_Status = BT_PLAY;
+                        else if (tmp == 'P')
+                        {
+                            if(BT_Status == BT_PLAY)
+                                BT_Status = BT_PAUSE;
+                        }
+                        else if (bt_rx_buff[3] == 'U')
+                        {
+                            if(tmp == '1')
+                                BT_Status = BT_NO_DEV;
+                            else if(((tmp == '3')||(tmp == '5'))&&(BT_Status == BT_NO_DEV))
+                                BT_Status = BT_CONN;
+                        }
+                    }
+                }
+            }
+        }
+    } 
 }
+
+/**=========================================================**/
+ /*----------------USB<=>MP3 Player Init--------------------*/
+/**---------------------------------------------------------**/
+void Init_USB(void)
+{
+    RCC->APB1ENR |= RCC_APB1ENR_UART4EN;
+    
+    UART4->BRR = APB1/9600;
+    UART4->CR1 = USART_CR1_UE |
+                 USART_CR1_TE |
+				 USART_CR1_RE;
+}
+
+ /*--------USB<=>MP3 Player send command function-----------*/
+/**---------------------------------------------------------**/
+uint8_t USB_send(uint8_t CMD)
+{
+    uint8_t tmp;
+    uint32_t delay = 0;
+    USB_command[2] = CMD;
+    
+    if(UART4->SR & USART_SR_RXNE)
+        tmp = UART4->DR;
+    
+    for(uint8_t i = 0;i<4;i++)
+    {
+        while(!(UART4->SR & USART_SR_TC));
+        UART4->DR = USB_command[i];
+    }
+    
+    switch(CMD)
+    {
+        case USB_Q_STATUS:
+        {
+            for(uint8_t i = 4;i>0;i--)
+            {
+                delay = 0;
+                while(!(UART4->SR & USART_SR_RXNE))
+                {
+                delay++;
+                if(delay == 2000000)
+                    return 1;
+                };
+                tmp = UART4->DR;
+                usb_status |= ((tmp - ((tmp >= 0x61)? 0x57:0x30)) << ((i-1)*4));
+            }
+            break;
+        }
+        case USB_Q_TRACK_COUNT:
+        {
+            for(uint8_t i = 4;i>0;i--)
+            {
+                delay = 0;
+                while(!(UART4->SR & USART_SR_RXNE))
+                {
+                delay++;
+                if(delay == 2000000)
+                    return 1;
+                };
+                tmp = UART4->DR;
+                usb_track_info.count |= ((tmp - ((tmp >= 0x61)? 0x57:0x30)) << ((i-1)*4));
+            }
+            break;
+        }
+        case USB_Q_TRACK_NUMBER:
+        {
+            for(uint8_t i = 4;i>0;i--)
+            {
+                delay = 0;
+                while(!(UART4->SR & USART_SR_RXNE))
+                {
+                delay++;
+                if(delay == 2000000)
+                    return 1;
+                };
+                tmp = UART4->DR;
+                usb_track_info.num |= ((tmp - ((tmp >= 0x61)? 0x57:0x30)) << ((i-1)*4));
+            }
+            break;
+        }
+        case USB_Q_TRACK_LONG:
+        {
+            for(uint8_t i = 4;i>0;i--)
+            {
+                delay = 0;
+                while(!(UART4->SR & USART_SR_RXNE))
+                {
+                delay++;
+                if(delay == 2000000)
+                    return 1;
+                };
+                tmp = UART4->DR;
+                usb_track_info.tlong |= ((tmp - ((tmp >= 0x61)? 0x57:0x30)) << ((i-1)*4));
+            }
+            break;
+        }
+        case USB_Q_TRACK_TIME:
+        {
+            for(uint8_t i = 4;i>0;i--)
+            {
+                delay = 0;
+                while(!(UART4->SR & USART_SR_RXNE))
+                {
+                delay++;
+                if(delay == 2000000)
+                    return 1;
+                };
+                tmp = UART4->DR;
+                usb_track_info.time |= ((tmp - ((tmp >= 0x61)? 0x57:0x30)) << ((i-1)*4));
+            }
+            break;
+        }
+        case USB_Q_TRACK_NAME:
+        {
+            for(uint8_t i = 0;i<11;i++)
+            {
+                delay = 0;
+                while(!(UART4->SR & USART_SR_RXNE))
+                {
+                delay++;
+                if(delay == 2000000)
+                    return 1;
+                };
+                tmp = UART4->DR;
+                usb_track_info.name[i] = tmp;
+            }
+            break;
+        }
+        case USB_CMD_PLAY:
+        case USB_CMD_PAUSE:
+        case USB_CMD_NEXT:
+        case USB_CMD_PREV:
+        {
+            for(uint8_t i = 0;i<2;i++)
+            {
+                delay = 0;
+                while(!(UART4->SR & USART_SR_RXNE))
+                {
+                delay++;
+                if(delay == 1000000)
+                    return 1;
+                };
+                uint8_t tmp = UART4->DR;
+            }           
+            break;
+        }
+    }
+        
+    for(uint32_t i = 0;i<5500000;i++){};
+    return 0;
+}
+
+ /*--USB<=>MP3 Player send command  with parameter function-*/
+/**---------------------------------------------------------**/
+uint8_t USB_send_par(uint8_t CMD, uint8_t PAR)
+{
+    uint32_t delay = 0;
+    uint8_t tmp;
+    USB_command5[2] = CMD;
+    USB_command5[3] = PAR;
+    
+    if(UART4->SR & USART_SR_RXNE)
+        tmp = UART4->DR;
+    
+    for(uint8_t i = 0;i<5;i++)
+    {
+        while(!(UART4->SR & USART_SR_TXE));
+        UART4->DR = USB_command5[i];
+    }
+    
+    if(CMD == USB_CMD_SOURCE)
+        for(uint8_t i = 0;i<5;i++)
+        {
+            delay = 0;
+            while(!(UART4->SR & USART_SR_RXNE))
+            {
+            delay++;
+            if(delay == 2000000)
+                return 1;
+            };
+            tmp = UART4->DR;
+            if(tmp == 'S')
+                return 1;
+        }
+    else
+        for(uint8_t i = 0;i<2;i++)
+        {
+            delay = 0;
+            while(!(UART4->SR & USART_SR_RXNE))
+            {
+            delay++;
+            if(delay == 2000000)
+                return 1;
+            };
+            tmp = UART4->DR;
+        }
+    for(uint32_t i = 0;i<4500000;i++){};
+    return 0;
+}
+
+/**=========================================================**/
+ /*----------------I2C1 Init--------------------------------*/
+/**---------------------------------------------------------**/
 void Init_I2C1(void)
 {
     //I2C1 Init
@@ -428,6 +720,8 @@ void Init_I2C1(void)
     I2C1->CR1 = I2C_CR1_PE;
 }
 
+ /*---------I2C1 Send data function-------------------------*/
+/**---------------------------------------------------------**/
 uint8_t I2C1_Send(uint8_t addres,uint8_t *buff, uint16_t size)
 {
     uint16_t i;
@@ -471,6 +765,9 @@ uint8_t I2C1_Send(uint8_t addres,uint8_t *buff, uint16_t size)
     return 0;
 }
 
+/**=========================================================**/
+ /*-------FM<=>TEA Set Freq funqtion------------------------*/
+/**---------------------------------------------------------**/
 uint8_t TEA_set_freq(uint16_t freq)
 {
     uint8_t tea[5];
@@ -486,6 +783,9 @@ uint8_t TEA_set_freq(uint16_t freq)
     return I2C1_Send(0xC0, tea,sizeof(tea));
 }
 
+/**=========================================================**/
+ /*-------TDA Inti funqtion------------------------*/
+/**---------------------------------------------------------**/
 uint8_t Init_TDA(void)
 {
 //	init_buff[1] = (STATE == MAIN) ? TDA_inputs[INPUT_SEL] : TDA_SOURCE_MUTE; // Main source = SE2(FM), gain = 0;
@@ -503,60 +803,141 @@ uint8_t Init_TDA(void)
 
     uint8_t I2C_buff[2], res;
     I2C_buff[0] = 0x00;         //Addr  0: Main Selector
-    I2C_buff[1] = TDA_inputs[BT];
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    I2C_buff[1] = TDA_inputs[AUDIO_INPUT];
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
     
     I2C_buff[0] = 4;            //Addr  4: Soft mute - OFF
     I2C_buff[1] = 0x1F;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
 
     I2C_buff[0] = 7;            //Addr  7: Loudness
     I2C_buff[1] = 0x00;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
     
     I2C_buff[0] = 8;            //Addr  8: Volume/Output gain
     I2C_buff[1] = 0x00;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
 
     I2C_buff[0] = 9;            //Addr  9: Treble filter
     I2C_buff[1] = 0x0F;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
 
     I2C_buff[0] = 10;           //Addr 10: Middle filter
     I2C_buff[1] = 0x0F;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
 
     I2C_buff[0] = 11;           //Addr 11: Bass filter
     I2C_buff[1] = 0x0F;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
     
     I2C_buff[0] = 12;           //Addr 12: Subwoofer/middle/bass
     I2C_buff[1] = 0x00;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
     
     I2C_buff[0] = 13;           //Addr 13: Speaker attenuation Front Lefr
     I2C_buff[1] = 0x00;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
     
     I2C_buff[0] = 14;           //Addr 14: Speaker attenuation Front Right
     I2C_buff[1] = 0x00;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
     
     I2C_buff[0] = 15;           //Addr 15: Speaker attenuation Rear Lefr
     I2C_buff[1] = 0x00;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
 
     I2C_buff[0] = 16;           //Addr 16: Speaker attenuation Rear Right
     I2C_buff[1] = 0x00;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
     
     I2C_buff[0] = 17;           //Addr 17: Speaker attenuation SW Lefr
     I2C_buff[1] = 0x00;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
     
     I2C_buff[0] = 18;           //Addr 18: Speaker attenuation SW Right
     I2C_buff[1] = 0x00;
-    res = I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
    
     return res;
+}
+
+/**=========================================================**/
+ /*-------------FLASH functions-----------------------------*/
+ /*----------------FLASH read-------------------------------*/
+/**---------------------------------------------------------**/
+uint32_t flash_read(uint32_t address)
+{
+	return (*(__IO uint32_t*) address);
+}
+ /*----------------FLASH ready-------------------------------*/
+/**---------------------------------------------------------**/
+//Функция возврщает true когда можно стирать или писать память.
+uint8_t flash_ready(void)
+{
+	return !(FLASH->SR & FLASH_SR_BSY);
+}
+
+ /*------------FLASH earse sector---------------------------*/
+/**---------------------------------------------------------**/
+//Функция стирает одну страницу. В качестве адреса можно использовать любой
+//принадлежащий диапазону адресов той странице которую нужно очистить.
+void flash_erase_sector(uint8_t sector) 
+{
+		FLASH->CR |= FLASH_CR_SER; //Устанавливаем бит стирания одной страницы
+		FLASH->CR |= sector << FLASH_CR_SNB_Pos; // Задаем её адрес
+		FLASH->CR |= FLASH_CR_STRT; // Запускаем стирание
+		
+		while(!flash_ready())//Ждем пока страница сотрется.
+		
+		FLASH->CR&= ~(FLASH_CR_SER); //Сбрасываем бит обратно
+}
+
+ /*----------------FLASH write-------------------------------*/
+/**---------------------------------------------------------**/
+void flash_write(uint32_t address, uint32_t data)
+{
+		FLASH->CR |= FLASH_CR_PG; //Разрешаем программирование флеша
+		
+		FLASH->CR |= FLASH_CR_PSIZE_1;
+		
+		while(!flash_ready()); //Ожидаем готовности флеша к записи
+		
+		*(__IO uint32_t*)address = (uint32_t)data; //Пишем младшие 2 бата
+		
+		while(!flash_ready());
+		
+		FLASH->CR &= ~(FLASH_CR_PG); //Запрещаем программирование флеша
+}
+
+ /*-----------FLASH write new data--------------------------*/
+/**---------------------------------------------------------**/
+void flash_write_newdata(void)
+{
+    uint32_t tmp_mem;
+    
+	flash_erase_sector(3); //start from 0x0800C000
+	if(GLOBAL_STATE == GLOBAL_STATE_TDA_SETT)
+    tmp_mem = (GLOBAL_STATE_MAIN << 24 )   | (AUDIO_INPUT << 16) | (0xFF00 & (VOLUME << 8 ));
+    else
+    tmp_mem = (GLOBAL_STATE << 24 )  | (AUDIO_INPUT << 16) | (0xFF00 & (VOLUME << 8 ));
+    
+    flash_write(MEM_ADDRESS, tmp_mem);
+    
+    tmp_mem = RADIO_FREQ << 16;
+	flash_write(RADIO_FREQ_ADR, tmp_mem); //Radio Freq
+    
+//    tmp_mem = (TDA_loudness.high_boost << 24) | (TDA_loudness.center_freq << 16) | (0xFF00 & (TDA_loudness.atteniation << 8));
+//    flash_write(TDA_MAIN_LOUD_ADR, tmp_mem); //Main loud
+//    
+//    tmp_mem = (TDA_treble.center_freq  << 24) | (0xFF0000 & (TDA_treble.atteniation   << 16));
+//    flash_write(TDA_TREB_ADR, tmp_mem); //Treble
+//    
+//    tmp_mem = (TDA_middle.Q_factot     << 24) | (TDA_middle.center_freq   << 16) | (0xFF00 & (TDA_middle.atteniation   << 8));
+//    flash_write(TDA_MIDD_ADR, tmp_mem); //Middle
+//    
+//    tmp_mem = (TDA_bass.Q_factot       << 24) | (TDA_bass.center_freq     << 16) | (0xFF00 & (TDA_bass.atteniation     << 8));
+//    flash_write(TDA_BASS_ADR, tmp_mem); //Bass
+//    
+//    tmp_mem = (0xFF000000 & (TDA_sp_att.left_front   << 24)) | (0xFF0000 & (TDA_sp_att.right_front   << 16)) | (0xFF00 & (TDA_sp_att.left_rear     << 8)) | (TDA_sp_att.right_rear & 0xFF);
+//    flash_write(TDA_SATT_ADR, tmp_mem); //Speaker attenuation
 }
