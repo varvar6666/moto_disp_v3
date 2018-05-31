@@ -12,6 +12,7 @@
 /*                  Copmilator defs                      */
 #define DEBUG //RELEASE
 //#define DEBUG_BT
+//#define DEBUG_TFT
 
 
 /*-------------------------------------------------------*/

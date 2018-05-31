@@ -171,7 +171,11 @@ int main(void)
                 break;}
             case AUDIO_USB:{
                     if(USB_res == 1)
+                    {
+                        TFT_send(main_text_font_7, sizeof(main_text_font_7));
+                    
                         TFT_send(main_NO_USB_text, sizeof(main_NO_USB_text));
+                    }
                     else
                     {
                         USB_send(USB_Q_TRACK_COUNT);
@@ -223,7 +227,7 @@ int main(void)
     NVIC_EnableIRQ(TIM8_TRG_COM_TIM14_IRQn);
     
 #ifdef DEBUG
-    LED4_ON;
+    LED1_ON;
 #endif
     BULB_CH_OFF;
     
@@ -369,7 +373,7 @@ void Init_GPIO(void)
                       GPIO_SPEED_FREQ_VERY_HIGH << PIN1*2;
     GPIOA->MODER |= GPIO_MODE_AF_PP << PIN0*2 |
                     GPIO_MODE_AF_PP << PIN1*2;
-    
+#ifndef DEBUG_TFT
 	//Set GPIOB PIN10 as usart3 TX & PIN11 as usart3 RX <===> TFT
     GPIOB->AFR[1] |= GPIO_AF7_USART3 << (PIN10*4-32) |
                      GPIO_AF7_USART3 << (PIN11*4-32);
@@ -379,7 +383,8 @@ void Init_GPIO(void)
 					  GPIO_SPEED_FREQ_VERY_HIGH << PIN1*2;
     GPIOB->MODER |= GPIO_MODE_AF_PP << PIN10*2 |
 					GPIO_MODE_AF_PP << PIN11*2;
-                    
+#endif
+             
     //Set GPIOC PIN12 as usart5 TX & GPIOD PIN2 as usart5 RX <===> BT
     GPIOC->AFR[1] |= GPIO_AF8_UART5 << (PIN12*4-32);
     GPIOD->AFR[0] |= GPIO_AF8_UART5 <<  PIN2*4;
@@ -461,6 +466,8 @@ void Init_RTC(void)
     }
 }
 
+
+
 /**=========================================================**/
  /*-----------------TFT Init--------------------------------*/
 /**---------------------------------------------------------**/
@@ -539,11 +546,20 @@ void Init_BT(void)
     RCC->APB1ENR |= RCC_APB1ENR_UART5EN;
     UART5->BRR = APB1/921600;
     UART5->CR1 = USART_CR1_UE | 
-                 USART_CR1_TE |
-                 USART_CR1_RXNEIE |
-                 USART_CR1_RE;
-    UART5->CR3 = USART_CR3_DMAT;
+                 USART_CR1_TE | 
+                 USART_CR1_RE |
+				 USART_CR1_IDLEIE;
+    UART5->CR3 = USART_CR3_DMAR |
+                 USART_CR3_DMAT;
 
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
+    DMA1_Stream0->CR = DMA_SxCR_MINC |
+					   DMA_SxCR_TCIE |
+                       DMA_SxCR_CHSEL_2;
+    DMA1_Stream0->PAR = (uint32_t) &UART5->DR;
+    DMA1_Stream0->M0AR = (uint32_t) bt_rx_buff;
+    DMA1_Stream0->NDTR = BT_RX_BUFF_SIZE;
+    DMA1_Stream0->CR |= DMA_SxCR_EN;    
     
     DMA1_Stream7->CR &= ~DMA_SxCR_EN;
     DMA1_Stream7->CR = DMA_SxCR_DIR_0 |
@@ -552,6 +568,7 @@ void Init_BT(void)
     DMA1_Stream7->PAR = (uint32_t) &UART5->DR;
     
 	NVIC_EnableIRQ(UART5_IRQn);
+    NVIC_EnableIRQ(DMA1_Stream0_IRQn);
     
 #endif
 }
@@ -570,69 +587,59 @@ void BT_send(uint8_t query)
     DMA1_Stream7->CR |= DMA_SxCR_EN;
 }
 
- /*-----Recive information about BT from UART5 Handler------*/
+ /*----------Recive information about BT UART5-------------*/
 /**---------------------------------------------------------**/
 void UART5_IRQHandler(void)
 {
-    uint8_t tmp = UART5->DR;
-    
-    UART5->SR = 0;
+	if(UART5->SR & USART_SR_IDLE)
+	{
+		volatile uint32_t tmp;
+		tmp = UART5->SR;
+		tmp = UART5->DR;
+		(void)tmp;
+		DMA1_Stream0->CR &= ~DMA_SxCR_EN;
+	}
+}
 
-    switch (tmp)
-    {
-        case 13:
+ /*--------------BT UART5 DMA recive Handler----------------*/
+/**---------------------------------------------------------**/
+void DMA1_Stream0_IRQHandler(void)
+{
+	DMA1->LIFCR = DMA_LIFCR_CTCIF0 |
+                  DMA_LIFCR_CHTIF0 | 
+                  DMA_LIFCR_CFEIF0 |
+                  DMA_LIFCR_CTEIF0 |
+				  DMA_LIFCR_CDMEIF0;
+	
+	DMA1_Stream0->M0AR = (uint32_t) bt_rx_buff;
+	DMA1_Stream0->NDTR = BT_RX_BUFF_SIZE;
+	DMA1_Stream0->CR |= DMA_SxCR_EN;
+    
+    if((bt_rx_buff[0] == 13)&&(bt_rx_buff[1] == 10))
+	{
+        switch(bt_rx_buff[3])
         {
-            if(bt_rx_buff[0] == 0)
-                bt_rx_buff[0] = tmp;
-            break;
-        }
-        case 10:
-        {
-            if(bt_rx_buff[1] == 0)
-                bt_rx_buff[1] = tmp;
-            else
-            {
-                bt_rx_buff[0] = 0;
-                bt_rx_buff[1] = 0;
-                bt_rx_buff[2] = 0;
-                bt_rx_buff[3] = 0;
-                bt_rx_buff[4] = 0;
-            }
-            break;
-        }
-        default:
-        {
-            if((bt_rx_buff[0] == 13)&&(bt_rx_buff[1] == 10))
-            {
-                if(bt_rx_buff[2] == 0)
-                    bt_rx_buff[2] = tmp;
-                else
-                {
-                    if(tmp == 'U')
-                        bt_rx_buff[3] = tmp;
-                    else
-                    {
-                        if(tmp == 'I')
+            case 'I':{
+                        BT_Status = BT_NO_DEV;
+                    break;}
+            case 'U':{
+                        if(bt_rx_buff[4] == '1')
                             BT_Status = BT_NO_DEV;
-                        else if (tmp == 'R')
-                            BT_Status = BT_PLAY;
-                        else if (tmp == 'P')
-                        {
-                            if(BT_Status == BT_PLAY)
-                                BT_Status = BT_PAUSE;
-                        }
-                        else if (bt_rx_buff[3] == 'U')
-                        {
-                            if(tmp == '1')
-                                BT_Status = BT_NO_DEV;
-                            else if(((tmp == '3')||(tmp == '5'))&&(BT_Status == BT_NO_DEV))
-                                BT_Status = BT_CONN;
-                        }
-                    }
-                }
-            }
-        }
-    } 
+                        else if(((bt_rx_buff[4] == '3')||(bt_rx_buff[4] == '5'))&&(BT_Status == BT_NO_DEV))
+                            BT_Status = BT_CONN;
+                    break;}
+            case 'P':{
+                        if (BT_Status == BT_PLAY)
+                            BT_Status = BT_PAUSE;
+                    break;}
+            case 'R':{
+                        BT_Status = BT_PLAY;
+                    break;}
+        
+        };
+        if ((GLOBAL_STATE == GLOBAL_STATE_MAIN) && (AUDIO_INPUT == AUDIO_BT))
+            TFT_send(main_BT_text[BT_Status],sizeof(main_BT_text[BT_Status]));
+    }
 }
 
 /**=========================================================**/
@@ -1184,7 +1191,7 @@ void Init_KEYs_TIM(void)
 {
     RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;
     TIM14->PSC = APB1_TIM/10000-1;
-    TIM14->ARR = 2000-1;
+    TIM14->ARR = 10000/100-1;
     TIM14->DIER = TIM_DIER_UIE;
     TIM14->CR1 = TIM_CR1_CEN; 
 }
@@ -1281,11 +1288,10 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
                             BT_ON;
                         
                             BT_send(BT_STATUS);
-                        
-                            TFT_send(main_BT_text[BT_Status], sizeof(main_BT_text[BT_Status]));
                         break;}
                     case AUDIO_USB:{
                         BT_OFF;
+                        BT_Status = BT_NO_DEV;
                         
                         USB_res = USB_send_par(USB_CMD_SOURCE, 0x00);
                         if(USB_res == 1)
@@ -1351,7 +1357,7 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
         OFF_counter = 0;
     }
     
-if(((GLOBAL_STATE == GLOBAL_STATE_MAIN)||(GLOBAL_STATE == GLOBAL_STATE_AUDIO_OFF))&&(delay_send >= 100))
+    if(((GLOBAL_STATE == GLOBAL_STATE_MAIN)||(GLOBAL_STATE == GLOBAL_STATE_AUDIO_OFF))&&(delay_send >= 100))
     {
 		delay_send = 0;
         
@@ -1375,7 +1381,7 @@ if(((GLOBAL_STATE == GLOBAL_STATE_MAIN)||(GLOBAL_STATE == GLOBAL_STATE_AUDIO_OFF
 		memcpy(&TFT_TIME[50], &day_of_week[((RTC->DR & RTC_DR_WDU_Msk) >> RTC_DR_WDU_Pos) - 1],9);
 
         TFT_send(TFT_TIME, sizeof(TFT_TIME));
-        if(AUDIO_INPUT == AUDIO_USB)
+        if((AUDIO_INPUT == AUDIO_USB) && (USB_res))
         {
             USB_send(USB_Q_STATUS);
             USB_send(USB_Q_TRACK_NUMBER);
