@@ -54,6 +54,9 @@ enum PINs
 #define BULB_CH_ON      GPIOA->BSRR |= GPIO_BSRR_BS8
 #define BULB_CH_OFF     GPIOA->BSRR |= GPIO_BSRR_BR8
 
+#define MUTE            GPIOC->BSRR |= GPIO_BSRR_BR13
+#define UNMUTE          GPIOC->BSRR |= GPIO_BSRR_BS13
+
 #define BT_SOUCE        GPIOA->IDR & GPIO_PIN_10 //BT1 <-> Source/onoff
 #define BT_PREV         GPIOA->IDR & GPIO_PIN_11 //BT2 <-> PREV
 #define BT_NEXT         GPIOA->IDR & GPIO_PIN_12 //BT3 <-> NEXT
@@ -167,25 +170,23 @@ enum TDA_SET_SATT_STATES
 /*-------------------------------------------------------*/
 /*                  TDA Defines TODO: CHECK                         */
 #define TDA7718_ADDRESS	    0x88
+
 #define TDA_MAIN_SOURCE		0x00
+#define TDA_SOFT_MUTE       0x04
+#define TDA_LOUDNESS        0x07
+#define TDA_VOLUME		    0x08
+#define TDA_TREBLE_FILTER   0x09
+#define TDA_MIDDLE_FILTER   0x0A
+#define TDA_BASS_FILTER     0x0B
+#define TDA_SUB_M_B         0x0C
+#define TDA_SPEAKER_ATT_LF  0x0D
+#define TDA_SPEAKER_ATT_RF  0x0E
+#define TDA_SPEAKER_ATT_LR  0x0F
+#define TDA_SPEAKER_ATT_RR  0x10
+#define TDA_SPEAKER_ATT_SL  0x11
+#define TDA_SPEAKER_ATT_SR  0x12
+
 #define TDA_SOURCE_MUTE		0x07
-
-#define TDA_SOFT_MUTE       0x02
-#define TDA_MUTE            0xC6
-#define TDA_UNMUTE          0xC7
-
-#define TDA_VOLUME		    0x03
-
-#define TDA_MAIN_LOUDNESS   0x01
-#define TDA_TREBLE_FILTER   0x04
-#define TDA_MIDDLE_FILTER   0x05
-#define TDA_BASS_FILTER     0x06
-#define TDA_M_B_CENT_FREQ   0x08
-#define TDA_SPEAKER_ATT_LF  0x0A
-#define TDA_SPEAKER_ATT_RF  0x0B
-#define TDA_SPEAKER_ATT_LR  0x0C
-#define TDA_SPEAKER_ATT_RR  0x0D
-
 //                             FM,   BT,   USB,  AUX
 const uint8_t TDA_inputs[4] = {0x04, 0x01, 0x05, 0x00};
 
@@ -197,9 +198,9 @@ uint8_t TFT_reset[7] = {'r','e','s','t',255,255,255};
 
 uint8_t loading_txt[13] = {'l','o','d','.','v','a','l','=','0','0',255,255,255};
 
-uint8_t TFT_TIME[56] = {'t','i','m','e','.','t','x','t','=','"',0,0,':',0,0,'"',255,255,255,\
-                        'd','a','t','e','.','t','x','t','=','"',' ',' ',0,0,'.',0,0,'.',0,0,' ',\
-						' ',' ',' ','d','a','y','o','f','w','e','e','k','"',255,255,255}; 
+uint8_t TFT_TIME[63] = {'t','i','m','e','.','t','x','t','=','"',0,0,':',0,0,'"',255,255,255,\
+                        'd','a','t','e','.','t','x','t','=','"',0,0,'.',0,0,'.',0,0,'"',255,255,255,\
+						'd','a','y','.','t','x','t','=','"','w','e','e','k',' ',' ','d','a','y','"',255,255,255}; 
 
 uint8_t pages[4][12] = {{'p','a','g','e',' ','l','o','a','d',255,255,255},
                         {'p','a','g','e',' ','a','o','f','f',255,255,255},
@@ -377,8 +378,9 @@ uint16_t ADC_Buff[ADC_BUF_NUM];
 /*--                Interrupts Handlers                --*/
 //void TIM8_TRG_COM_TIM14_IRQHandler(void);         //Button parse timer interrupt
 //void DMA1_Stream2_IRQHandler(void);
-//void DMA2_Stream0_IRQHandler(void);
+void DMA2_Stream0_IRQHandler(void);
 void UART5_IRQHandler(void);                        //Recive information from BT
+void TIM4_IRQHandler(void);
 //void UART4_IRQHandler(void);
 
 /*--                Clock Inits                        --*/
@@ -412,6 +414,7 @@ uint8_t TEA_set_freq(uint16_t freq);
 uint8_t Init_TDA(void);
 
 void Init_ADC(void);
+void Init_Pulse_IN(void);
 
 void Init_IWDG(void);
 void IWDG_res(void);
