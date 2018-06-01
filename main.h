@@ -383,6 +383,7 @@ void DMA2_Stream0_IRQHandler(void);
 void UART5_IRQHandler(void);                        //Recive information from BT
 void TIM4_IRQHandler(void);
 //void UART4_IRQHandler(void);
+void RTC_Alarm_IRQHandler(void);
 
 /*--                Clock Inits                        --*/
 void Init_RCC(void);
@@ -397,6 +398,7 @@ void flash_write_newdata(void);
 	
 void Init_GPIO(void);
 void Init_RTC(void);
+
 void Init_TFT(void);
 void TFT_send(uint8_t *buff, uint8_t size);
 void Init_KEYs_TIM(void);

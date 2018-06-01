@@ -222,7 +222,8 @@ int main(void)
     }
     
     Init_KEYs_TIM();
-    
+
+    NVIC_EnableIRQ(RTC_Alarm_IRQn);
     NVIC_EnableIRQ(DMA2_Stream0_IRQn);
     NVIC_EnableIRQ(TIM8_TRG_COM_TIM14_IRQn);
     
@@ -241,7 +242,6 @@ int main(void)
         }
     }
 }
-
 /**=========================================================**/
  /*------------Main clocks Init-----------------------------*/
 /**---------------------------------------------------------**/
@@ -461,12 +461,65 @@ void Init_RTC(void)
         
         RCC->BDCR |= RCC_BDCR_LSEON;//Включить LSE
         while ((RCC->BDCR & RCC_BDCR_LSEON) != RCC_BDCR_LSEON){} //Дождаться включения
-    
         PWR->CR &= ~PWR_CR_DBP;//запретить доступ к Backup области
     }
+    RCC->APB1ENR |= RCC_APB1ENR_PWREN;
+    PWR->CR |= PWR_CR_DBP;
+    RTC->WPR = 0xCA;
+    RTC->WPR = 0x53;
+    EXTI->PR |= EXTI_PR_PR17;
+    EXTI->IMR |= EXTI_IMR_MR17;
+    EXTI->EMR &= ~EXTI_EMR_MR17;
+    EXTI->RTSR |= EXTI_RTSR_TR17;
+    
+    RTC->CR &= ~RTC_CR_ALRAE;
+    while(!(RTC->ISR & RTC_ISR_ALRAWF)){};
+    RTC->ALRMAR = RTC_ALRMAR_MSK1 |
+                  RTC_ALRMAR_MSK2 |
+                  RTC_ALRMAR_MSK3 |
+                  RTC_ALRMAR_MSK4;
+        
+    RTC->CR |= RTC_CR_ALRAE |
+               RTC_CR_ALRAIE;
+
+    RTC->WPR = 0xFF;
+
 }
 
+ /*-----------RTC 1 second handler--------------------------*/
+/**---------------------------------------------------------**/
+void RTC_Alarm_IRQHandler(void)
+{
+#ifdef DEBUG
+    LED4_ON;
+#endif
+    
+    RTC->ISR &= ~RTC_ISR_ALRAF;
+    EXTI->PR |= EXTI_PR_PR17;
+    
+    TFT_TIME[14] = ((RTC->TR & RTC_TR_MNU_Msk)>> RTC_TR_MNU_Pos)+ 0x30; // minute
+    TFT_TIME[13] = ((RTC->TR & RTC_TR_MNT_Msk)>> RTC_TR_MNT_Pos)+ 0x30;
+    
+    TFT_TIME[11] = ((RTC->TR & RTC_TR_HU_Msk) >> RTC_TR_HU_Pos) + 0x30; // hour
+    TFT_TIME[10] = ((RTC->TR & RTC_TR_HT_Msk) >> RTC_TR_HT_Pos) + 0x30;
+    
+    TFT_TIME[30] =  (RTC->DR & RTC_DR_DU_Msk)   				+ 0x30; // day
+    TFT_TIME[29] = ((RTC->DR & RTC_DR_DT_Msk) >> RTC_DR_DT_Pos) + 0x30;
+    
+    TFT_TIME[33] = ((RTC->DR & RTC_DR_MU_Msk) >> RTC_DR_MU_Pos) + 0x30; // month
+    TFT_TIME[32] = ((RTC->DR & RTC_DR_MT_Msk) >> RTC_DR_MT_Pos) + 0x30;
+    
+    TFT_TIME[36] = ((RTC->DR & RTC_DR_YU_Msk) >> RTC_DR_YU_Pos) + 0x30; // year
+    TFT_TIME[35] = ((RTC->DR & RTC_DR_YT_Msk) >> RTC_DR_YT_Pos) + 0x30;
+    
+    memcpy(&TFT_TIME[50], &day_of_week[((RTC->DR & RTC_DR_WDU_Msk) >> RTC_DR_WDU_Pos) - 1],9);
 
+    TFT_send(TFT_TIME, sizeof(TFT_TIME));
+    
+#ifdef DEBUG
+    LED4_OFF;
+#endif
+}
 
 /**=========================================================**/
  /*-----------------TFT Init--------------------------------*/
@@ -505,7 +558,9 @@ void Init_TFT(void)
 /**---------------------------------------------------------**/
 void TFT_send(uint8_t *buff, uint8_t size)
 {
+#ifdef DEBUG
     LED2_ON;
+#endif
     while(DMA1_Stream3->NDTR != 0){};
     while(!(USART3->SR & USART_SR_TC)){};
         
@@ -518,8 +573,9 @@ void TFT_send(uint8_t *buff, uint8_t size)
                   DMA_LIFCR_CFEIF3 |
                   DMA_LIFCR_CTEIF3;
     DMA1_Stream3->CR |= DMA_SxCR_EN;
-      
+#ifdef DEBUG
     LED2_OFF;
+#endif
 }
 
 /**=========================================================**/
@@ -1123,6 +1179,9 @@ void Init_ADC(void)
 /**---------------------------------------------------------**/
 void DMA2_Stream0_IRQHandler(void)
 {
+#ifdef DEBUG
+    LED3_ON;
+#endif
     DMA2->LIFCR |= DMA_LIFCR_CFEIF0 |
                    DMA_LIFCR_CDMEIF0 |
                    DMA_LIFCR_CTEIF0 |
@@ -1140,6 +1199,9 @@ void DMA2_Stream0_IRQHandler(void)
     ADC_text[19] = (P_IN -(P_IN/10)*10) + 0x30;
     
     TFT_send(ADC_text, sizeof(ADC_text));
+#ifdef DEBUG
+    LED3_OFF;
+#endif
 }
 
 /**=========================================================**/
@@ -1357,29 +1419,34 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
         OFF_counter = 0;
     }
     
+    switch (GLOBAL_STATE)
+    {
+        case GLOBAL_STATE_AUDIO_OFF:
+        {
+            
+            break;
+        }
+        case GLOBAL_STATE_MAIN:
+        {
+
+            break;
+        }
+        case GLOBAL_STATE_SET_TIME:
+        {
+            break;
+        }
+        case GLOBAL_STATE_TDA_SETT:
+        {
+            break;
+        }
+    }
+    
     if(((GLOBAL_STATE == GLOBAL_STATE_MAIN)||(GLOBAL_STATE == GLOBAL_STATE_AUDIO_OFF))&&(delay_send >= 100))
     {
 		delay_send = 0;
         
         BT_send(BT_STATUS);
         
-        TFT_TIME[14] = ((RTC->TR & RTC_TR_MNU_Msk)>> RTC_TR_MNU_Pos)+ 0x30; // minute
-        TFT_TIME[13] = ((RTC->TR & RTC_TR_MNT_Msk)>> RTC_TR_MNT_Pos)+ 0x30;
-        
-        TFT_TIME[11] = ((RTC->TR & RTC_TR_HU_Msk) >> RTC_TR_HU_Pos) + 0x30; // hour
-        TFT_TIME[10] = ((RTC->TR & RTC_TR_HT_Msk) >> RTC_TR_HT_Pos) + 0x30;
-        
-        TFT_TIME[30] =  (RTC->DR & RTC_DR_DU_Msk)   				+ 0x30; // day
-        TFT_TIME[29] = ((RTC->DR & RTC_DR_DT_Msk) >> RTC_DR_DT_Pos) + 0x30;
-        
-        TFT_TIME[33] = ((RTC->DR & RTC_DR_MU_Msk) >> RTC_DR_MU_Pos) + 0x30; // month
-        TFT_TIME[32] = ((RTC->DR & RTC_DR_MT_Msk) >> RTC_DR_MT_Pos) + 0x30;
-        
-        TFT_TIME[36] = ((RTC->DR & RTC_DR_YU_Msk) >> RTC_DR_YU_Pos) + 0x30; // year
-        TFT_TIME[35] = ((RTC->DR & RTC_DR_YT_Msk) >> RTC_DR_YT_Pos) + 0x30;
-        
-		memcpy(&TFT_TIME[50], &day_of_week[((RTC->DR & RTC_DR_WDU_Msk) >> RTC_DR_WDU_Pos) - 1],9);
-
         TFT_send(TFT_TIME, sizeof(TFT_TIME));
         if((AUDIO_INPUT == AUDIO_USB) && (USB_res))
         {
