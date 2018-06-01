@@ -419,5 +419,8 @@ uint8_t Init_TDA(void);
 void Init_ADC(void);
 void Init_Pulse_IN(void);
 
+void TFT_switch_audio_input(void);
+void TFT_send_vol(void);
+
 void Init_IWDG(void);
 void IWDG_res(void);
