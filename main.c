@@ -28,6 +28,40 @@ uint32_t RawFreq;
 uint32_t truefreq = 0;
 uint8_t Flag = 0;
 
+typedef struct _Node
+{
+    char Name;
+    uint8_t ID;
+    struct _Node *next;
+    struct _Node *prev;
+} Node;
+
+typedef struct _List
+{
+    uint8_t size;
+    Node *head;
+} List;
+
+List* createList()
+{
+    List *tmp = (List*)malloc(sizeof(List));
+    tmp->size = 0;
+    tmp->head = NULL;
+    return tmp;
+}
+
+void pushBack(List *list, uint8_t id)
+{
+    Node *tmp = (Node*) malloc(sizeof(Node));
+    if(tmp == NULL)
+    {
+        exit(3);
+    }
+    tmp->ID = id;
+    tmp->next = NULL;
+    
+}
+
 int main(void)
 {
 /**---------------------------------------------------------**/
