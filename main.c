@@ -28,46 +28,129 @@ uint32_t RawFreq;
 uint32_t truefreq = 0;
 uint8_t Flag = 0;
 
-typedef struct _Node
+typedef struct _Node_time
 {
-    char Name;
+    char Name[3];
+    uint8_t Value;
+    uint8_t MIN_value;
+    uint8_t MAX_value;
     uint8_t ID;
-    struct _Node *next;
-    struct _Node *prev;
-} Node;
+    struct _Node_time *next;
+    struct _Node_time *prev;
+} Node_time;
 
-typedef struct _List
+typedef struct _List_time
 {
     uint8_t size;
-    Node *head;
-} List;
+    Node_time *head;
+    Node_time *tail;
+} List_time;
 
-List* createList()
+List_time* createList_time()
 {
-    List *tmp = (List*)malloc(sizeof(List));
+    List_time *tmp = (List_time*)malloc(sizeof(List_time));
     tmp->size = 0;
-    tmp->head = NULL;
+    tmp->head = tmp->tail = NULL;
     return tmp;
 }
 
-void pushBack(List *list, uint8_t id)
+void pushBack_time(List_time *list, char *name, uint8_t value, uint8_t min_value, uint8_t max_value)
 {
-    Node *tmp = (Node*) malloc(sizeof(Node));
+    Node_time *tmp = (Node_time*) malloc(sizeof(Node_time));
     if(tmp == NULL)
     {
         exit(3);
     }
-    tmp->ID = id;
+    memcpy(tmp->Name, name, 3);
+    tmp->Value = value;
+    tmp->MIN_value = min_value;
+    tmp->MAX_value = max_value;
+    tmp->ID = list->size;
+
     tmp->next = NULL;
     
+    tmp->prev = list->tail;
+    if (list->tail) {
+        list->tail->next = tmp;
+    }
+    list->tail = tmp;
+ 
+    if (list->head == NULL) {
+        list->head = tmp;
+    }
+    list->size++;
 }
 
+uint8_t set_time_txt[15] = {'_','_','_','.','t','x','t','=','"','_','_','"',255,255,255};
+uint8_t set_time_d_w_txt[22] = {'d','_','w','.','t','x','t','=','"','_','_','_','_','_','_','_','_','_','"',255,255,255};
+    
+void print_set_time_txt(Node_time *tmp)
+{
+    if(tmp->Name[2] == 'w')
+    {
+        memcpy(&set_time_d_w_txt[9], day_of_week[tmp->Value-1], 9);
+        
+        TFT_send(set_time_d_w_txt, sizeof(set_time_d_w_txt));
+    }
+    else
+    {
+        memcpy(set_time_txt, tmp->Name, 3);
+        
+        set_time_txt[9] = tmp->Value / 10                    + 0x30;
+        set_time_txt[10] = tmp->Value - (tmp->Value / 10)*10 + 0x30;
+        
+        TFT_send(set_time_txt, sizeof(set_time_txt));
+    }
+}
+
+uint8_t set_time_select[72] = {'t','_','h','.','v','a','l','=','0',255,255,255,
+                               't','_','m','.','v','a','l','=','0',255,255,255,
+                               'd','_','d','.','v','a','l','=','0',255,255,255,
+                               'd','_','m','.','v','a','l','=','0',255,255,255,
+                               'd','_','y','.','v','a','l','=','0',255,255,255,
+                               'd','_','w','.','v','a','l','=','0',255,255,255};
+
+void print_set_time_selet(Node_time *tmp)
+{
+    for(uint8_t i = 0;i < 6; i++)
+        set_time_select[8 + (i * 12)] = 0 + 0x30;
+    set_time_select[8 + (tmp->ID * 12)] = 1 + 0x30;
+    
+    TFT_send(set_time_txt, sizeof(set_time_txt));
+}
+                               
 int main(void)
 {
+    List_time *date_List = createList_time();
+    Node_time *current_time;
+    pushBack_time(date_List, "t_h", 0,  0, 23);
+    pushBack_time(date_List, "t_m", 0,  0, 59);
+    pushBack_time(date_List, "d_d", 0,  1, 31);
+    pushBack_time(date_List, "d_m", 0,  1, 12);
+    pushBack_time(date_List, "d_y", 0, 18, 30);
+    pushBack_time(date_List, "d_w", 1,  1,  7);
+    
+    current_time = date_List->head;
+
+    current_time->Value = 10;
+    
+    print_set_time_selet(current_time);
+    
+    current_time = current_time->next;
+    
+    print_set_time_selet(current_time);
+    
+    current_time = current_time->next->next;
+    
+    print_set_time_selet(current_time);
+    
+
+
+    
 /**---------------------------------------------------------**/
  /*          Init all                                       */
     Init_RCC();                             //Clocks
-
+    
     Init_GPIO();                            //GPIO
     
     AMP_OFF;                                //Off Amplifier
