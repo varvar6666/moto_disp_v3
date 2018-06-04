@@ -72,8 +72,8 @@ enum PINs
 #define BT_ENC_B        GPIOB->IDR & GPIO_PIN_5 //ENC_B <-> Reserved
 #define BT_ENC          GPIOB->IDR & GPIO_PIN_6 //ENC_B <-> Reserved
 
-#define BT_CLK_DOWN     GPIOA->IDR & GPIO_PIN_8  //Clock DOWN
-#define BT_CLK_UP       GPIOA->IDR & GPIO_PIN_9  //Clock UP
+#define BT_CLK_DOWN     GPIOB->IDR & GPIO_PIN_12  //Clock DOWN
+#define BT_CLK_UP       GPIOB->IDR & GPIO_PIN_13  //Clock UP
 
 #define LED1_ON         GPIOC->BSRR |= GPIO_BSRR_BS4
 #define LED1_OFF        GPIOC->BSRR |= GPIO_BSRR_BR4

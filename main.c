@@ -116,37 +116,15 @@ void print_set_time_selet(Node_time *tmp)
         set_time_select[8 + (i * 12)] = 0 + 0x30;
     set_time_select[8 + (tmp->ID * 12)] = 1 + 0x30;
     
-    TFT_send(set_time_txt, sizeof(set_time_txt));
+    TFT_send(set_time_select, sizeof(set_time_select));
 }
                                
+
+List_time *date_List;
+Node_time *current_time;
+
 int main(void)
-{
-    List_time *date_List = createList_time();
-    Node_time *current_time;
-    pushBack_time(date_List, "t_h", 0,  0, 23);
-    pushBack_time(date_List, "t_m", 0,  0, 59);
-    pushBack_time(date_List, "d_d", 0,  1, 31);
-    pushBack_time(date_List, "d_m", 0,  1, 12);
-    pushBack_time(date_List, "d_y", 0, 18, 30);
-    pushBack_time(date_List, "d_w", 1,  1,  7);
-    
-    current_time = date_List->head;
-
-    current_time->Value = 10;
-    
-    print_set_time_selet(current_time);
-    
-    current_time = current_time->next;
-    
-    print_set_time_selet(current_time);
-    
-    current_time = current_time->next->next;
-    
-    print_set_time_selet(current_time);
-    
-
-
-    
+{   
 /**---------------------------------------------------------**/
  /*          Init all                                       */
     Init_RCC();                             //Clocks
@@ -266,8 +244,18 @@ int main(void)
         UNMUTE;
     }
     
+    date_List = createList_time();
+    pushBack_time(date_List, "t_h", 0,  0, 23);
+    pushBack_time(date_List, "t_m", 0,  0, 59);
+    pushBack_time(date_List, "d_d", 0,  1, 31);
+    pushBack_time(date_List, "d_m", 0,  1, 12);
+    pushBack_time(date_List, "d_y", 0, 18, 30);
+    pushBack_time(date_List, "d_w", 1,  1,  7);
+    
+
     Init_KEYs_TIM();
 
+    
     NVIC_EnableIRQ(RTC_Alarm_IRQn);
     NVIC_EnableIRQ(DMA2_Stream0_IRQn);
     NVIC_EnableIRQ(TIM8_TRG_COM_TIM14_IRQn);
@@ -559,7 +547,8 @@ void RTC_Alarm_IRQHandler(void)
     
     memcpy(&TFT_TIME[50], &day_of_week[((RTC->DR & RTC_DR_WDU_Msk) >> RTC_DR_WDU_Pos) - 1],9);
 
-    TFT_send(TFT_TIME, sizeof(TFT_TIME));
+    if((GLOBAL_STATE == GLOBAL_STATE_MAIN) || (GLOBAL_STATE == GLOBAL_STATE_AUDIO_OFF))
+        TFT_send(TFT_TIME, sizeof(TFT_TIME));
     
 #ifdef DEBUG
     LED4_OFF;
@@ -1243,7 +1232,8 @@ void DMA2_Stream0_IRQHandler(void)
     ADC_text[18] = (P_IN -(P_IN/100)*100)/10 + 0x30;
     ADC_text[19] = (P_IN -(P_IN/10)*10) + 0x30;
     
-    TFT_send(ADC_text, sizeof(ADC_text));
+    if((GLOBAL_STATE == GLOBAL_STATE_MAIN) || (GLOBAL_STATE == GLOBAL_STATE_AUDIO_OFF))
+        TFT_send(ADC_text, sizeof(ADC_text));
 #ifdef DEBUG
     LED3_OFF;
 #endif
@@ -1381,6 +1371,104 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
         OFF_counter = 0;
     }
     
+/*--++--PP button--++--*/
+    if(BT_PP)
+    {
+        switch(GLOBAL_STATE)
+        {
+            case GLOBAL_STATE_MAIN:
+            {
+                break;
+            }
+            case GLOBAL_STATE_SET_TIME:
+            {
+                current_time = date_List->head;
+                RCC->APB1ENR |= RCC_APB1ENR_PWREN;
+                PWR->CR |= PWR_CR_DBP;
+                RTC->WPR = 0xCA;
+                RTC->WPR = 0x53;
+                RTC->ISR |= RTC_ISR_INIT;
+                while((RTC->ISR & RTC_ISR_INITF) == 0){};
+                RTC->TR  = (current_time->Value/10 << 20) |
+                           (current_time->Value - ((current_time->Value/10)*10)) << 16;
+                current_time = current_time->next;
+                RTC->TR |= (current_time->Value/10 << 12) |
+                           (current_time->Value - ((current_time->Value/10)*10)) <<  8;
+
+//                RTC->DR = (day/10 << 4)  | 
+//                          (day - (day/10)*10) | 
+//                          (mon/10 << 12) | 
+//                         ((mon - ((mon/10)*10)) << 8) | 
+//                          (year/10 << 20) |
+//                         ((year - ((year/10)*10)) << 16) |
+//                          (week_day << 13);
+                RTC->ISR &= ~RTC_ISR_INIT;
+                RTC->WPR = 0xFF;
+                PWR->CR &= ~PWR_CR_DBP;
+                
+                GLOBAL_STATE = PREVIOS_STATE;
+                TFT_send(pages[GLOBAL_STATE], sizeof(pages[GLOBAL_STATE]));
+                
+
+                break;
+            }
+            case GLOBAL_STATE_TDA_SETT:
+            {
+                break;
+            }
+        }
+    }
+    
+/*--++--NEXT button--++--*/
+    if(BT_NEXT)
+    {
+        switch(GLOBAL_STATE)
+        {
+            case GLOBAL_STATE_MAIN:
+            {
+                break;
+            }
+            case GLOBAL_STATE_SET_TIME:
+            {
+                if(current_time->next == NULL)
+                   current_time = date_List->head;
+                else                
+                    current_time = current_time->next;
+                print_set_time_selet(current_time);
+                break;
+            }
+            case GLOBAL_STATE_TDA_SETT:
+            {
+                break;
+            }
+        }
+    }
+    
+/*--++--PREv button--++--*/
+    if(BT_PREV)
+    {
+        switch(GLOBAL_STATE)
+        {
+            case GLOBAL_STATE_MAIN:
+            {
+                break;
+            }
+            case GLOBAL_STATE_SET_TIME:
+            {
+                if(current_time->prev == NULL)
+                   current_time = date_List->tail;
+                else                
+                    current_time = current_time->prev;
+                print_set_time_selet(current_time);
+                break;
+            }
+            case GLOBAL_STATE_TDA_SETT:
+            {
+                break;
+            }
+        }
+    }
+    
 /*--++--Volume UP button--++--*/
     if(BT_VOL_UP)
     {
@@ -1392,6 +1480,9 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
             }
             case GLOBAL_STATE_SET_TIME:
             {
+                if(current_time->Value < current_time->MAX_value)
+                    current_time->Value++;
+                print_set_time_txt(current_time);
                 break;
             }
             case GLOBAL_STATE_TDA_SETT:
@@ -1400,6 +1491,68 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
             }
         }
     }
+    
+/*--++--Volume DOWN button--++--*/
+    if(BT_VOL_DOWN)
+    {
+        switch(GLOBAL_STATE)
+        {
+            case GLOBAL_STATE_MAIN:
+            {
+                break;
+            }
+            case GLOBAL_STATE_SET_TIME:
+            {
+                if(current_time->Value > current_time->MIN_value)
+                    current_time->Value--;
+                print_set_time_txt(current_time);
+                break;
+            }
+            case GLOBAL_STATE_TDA_SETT:
+            {
+                break;
+            }
+        }
+    }
+    
+    if(BT_CLK_UP)
+    {
+        PREVIOS_STATE = GLOBAL_STATE;
+        GLOBAL_STATE = GLOBAL_STATE_SET_TIME;
+        TFT_send(pages[GLOBAL_STATE], sizeof(pages[GLOBAL_STATE]));
+        
+        current_time = date_List->head;
+        
+        print_set_time_selet(current_time);
+        
+        current_time->Value = ((RTC->TR & RTC_TR_HT_Msk) >> RTC_TR_HT_Pos)*10 + ((RTC->TR & RTC_TR_HU_Msk) >> RTC_TR_HU_Pos);
+        print_set_time_txt(current_time);
+        
+        current_time = current_time->next;
+        current_time->Value = ((RTC->TR & RTC_TR_MNT_Msk)>> RTC_TR_MNT_Pos)*10+ ((RTC->TR & RTC_TR_MNU_Msk)>> RTC_TR_MNU_Pos);
+        print_set_time_txt(current_time);
+        
+        current_time = current_time->next;
+        current_time->Value = ((RTC->DR & RTC_DR_DT_Msk) >> RTC_DR_DT_Pos)*10 +  (RTC->DR & RTC_DR_DU_Msk);
+        print_set_time_txt(current_time);
+        
+        current_time = current_time->next;
+        current_time->Value = ((RTC->DR & RTC_DR_MT_Msk) >> RTC_DR_MT_Pos)*10 + ((RTC->DR & RTC_DR_MU_Msk) >> RTC_DR_MU_Pos);
+        print_set_time_txt(current_time);
+        
+        current_time = current_time->next;
+        current_time->Value = ((RTC->DR & RTC_DR_YT_Msk) >> RTC_DR_YT_Pos)*10 + ((RTC->DR & RTC_DR_YU_Msk) >> RTC_DR_YU_Pos);
+        print_set_time_txt(current_time);
+        
+        current_time = current_time->next;
+        current_time->Value = (RTC->DR & RTC_DR_WDU_Msk) >> RTC_DR_WDU_Pos;
+        print_set_time_txt(current_time);
+        
+        current_time = date_List->head;
+        
+    
+    }
+    
     
     if(((GLOBAL_STATE == GLOBAL_STATE_MAIN)||(GLOBAL_STATE == GLOBAL_STATE_AUDIO_OFF))&&(delay_send >= 100))
     {
