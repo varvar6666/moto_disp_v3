@@ -28,101 +28,6 @@ uint32_t RawFreq;
 uint32_t truefreq = 0;
 uint8_t Flag = 0;
 
-typedef struct _Node_time
-{
-    char Name[3];
-    uint8_t Value;
-    uint8_t MIN_value;
-    uint8_t MAX_value;
-    uint8_t ID;
-    struct _Node_time *next;
-    struct _Node_time *prev;
-} Node_time;
-
-typedef struct _List_time
-{
-    uint8_t size;
-    Node_time *head;
-    Node_time *tail;
-} List_time;
-
-List_time* createList_time()
-{
-    List_time *tmp = (List_time*)malloc(sizeof(List_time));
-    tmp->size = 0;
-    tmp->head = tmp->tail = NULL;
-    return tmp;
-}
-
-void pushBack_time(List_time *list, char *name, uint8_t value, uint8_t min_value, uint8_t max_value)
-{
-    Node_time *tmp = (Node_time*) malloc(sizeof(Node_time));
-    if(tmp == NULL)
-    {
-        exit(3);
-    }
-    memcpy(tmp->Name, name, 3);
-    tmp->Value = value;
-    tmp->MIN_value = min_value;
-    tmp->MAX_value = max_value;
-    tmp->ID = list->size;
-
-    tmp->next = NULL;
-    
-    tmp->prev = list->tail;
-    if (list->tail) {
-        list->tail->next = tmp;
-    }
-    list->tail = tmp;
- 
-    if (list->head == NULL) {
-        list->head = tmp;
-    }
-    list->size++;
-}
-
-uint8_t set_time_txt[15] = {'_','_','_','.','t','x','t','=','"','_','_','"',255,255,255};
-uint8_t set_time_d_w_txt[22] = {'d','_','w','.','t','x','t','=','"','_','_','_','_','_','_','_','_','_','"',255,255,255};
-    
-void print_set_time_txt(Node_time *tmp)
-{
-    if(tmp->Name[2] == 'w')
-    {
-        memcpy(&set_time_d_w_txt[9], day_of_week[tmp->Value-1], 9);
-        
-        TFT_send(set_time_d_w_txt, sizeof(set_time_d_w_txt));
-    }
-    else
-    {
-        memcpy(set_time_txt, tmp->Name, 3);
-        
-        set_time_txt[9] = tmp->Value / 10                    + 0x30;
-        set_time_txt[10] = tmp->Value - (tmp->Value / 10)*10 + 0x30;
-        
-        TFT_send(set_time_txt, sizeof(set_time_txt));
-    }
-}
-
-uint8_t set_time_select[72] = {'t','_','h','.','v','a','l','=','0',255,255,255,
-                               't','_','m','.','v','a','l','=','0',255,255,255,
-                               'd','_','d','.','v','a','l','=','0',255,255,255,
-                               'd','_','m','.','v','a','l','=','0',255,255,255,
-                               'd','_','y','.','v','a','l','=','0',255,255,255,
-                               'd','_','w','.','v','a','l','=','0',255,255,255};
-
-void print_set_time_selet(Node_time *tmp)
-{
-    for(uint8_t i = 0;i < 6; i++)
-        set_time_select[8 + (i * 12)] = 0 + 0x30;
-    set_time_select[8 + (tmp->ID * 12)] = 1 + 0x30;
-    
-    TFT_send(set_time_select, sizeof(set_time_select));
-}
-                               
-
-List_time *date_List;
-Node_time *current_time;
-
 int main(void)
 {   
 /**---------------------------------------------------------**/
@@ -548,7 +453,10 @@ void RTC_Alarm_IRQHandler(void)
     memcpy(&TFT_TIME[50], &day_of_week[((RTC->DR & RTC_DR_WDU_Msk) >> RTC_DR_WDU_Pos) - 1],9);
 
     if((GLOBAL_STATE == GLOBAL_STATE_MAIN) || (GLOBAL_STATE == GLOBAL_STATE_AUDIO_OFF))
+    {    
         TFT_send(TFT_TIME, sizeof(TFT_TIME));
+        TFT_send(ADC_text, sizeof(ADC_text));
+    }
     
 #ifdef DEBUG
     LED4_OFF;
@@ -1232,8 +1140,8 @@ void DMA2_Stream0_IRQHandler(void)
     ADC_text[18] = (P_IN -(P_IN/100)*100)/10 + 0x30;
     ADC_text[19] = (P_IN -(P_IN/10)*10) + 0x30;
     
-    if((GLOBAL_STATE == GLOBAL_STATE_MAIN) || (GLOBAL_STATE == GLOBAL_STATE_AUDIO_OFF))
-        TFT_send(ADC_text, sizeof(ADC_text));
+//    if((GLOBAL_STATE == GLOBAL_STATE_MAIN) || (GLOBAL_STATE == GLOBAL_STATE_AUDIO_OFF))
+//        TFT_send(ADC_text, sizeof(ADC_text));
 #ifdef DEBUG
     LED3_OFF;
 #endif
@@ -1281,6 +1189,77 @@ void TIM4_IRQHandler(void)
     TIM4->CR1 |= TIM_CR1_CEN;
 }
 
+/**=========================================================**/
+ /*-------------Set time List. Create-----------------------*/
+/**---------------------------------------------------------**/
+List_time* createList_time(void)
+{
+    List_time *tmp = (List_time*)malloc(sizeof(List_time));
+    tmp->size = 0;
+    tmp->head = tmp->tail = NULL;
+    return tmp;
+}
+
+ /*---------Set time List. Add item in tail-----------------*/
+/**---------------------------------------------------------**/
+void pushBack_time(List_time *list, char *name, uint8_t value, uint8_t min_value, uint8_t max_value)
+{
+    Node_time *tmp = (Node_time*) malloc(sizeof(Node_time));
+    if(tmp == NULL)
+    {
+        exit(3);
+    }
+    memcpy(tmp->Name, name, 3);
+    tmp->Value = value;
+    tmp->MIN_value = min_value;
+    tmp->MAX_value = max_value;
+    tmp->ID = list->size;
+
+    tmp->next = NULL;
+    
+    tmp->prev = list->tail;
+    if (list->tail) {
+        list->tail->next = tmp;
+    }
+    list->tail = tmp;
+ 
+    if (list->head == NULL) {
+        list->head = tmp;
+    }
+    list->size++;
+}
+
+ /*-----Set time List. Send current time to TFT-------------*/
+/**---------------------------------------------------------**/
+void print_set_time_txt(Node_time *tmp)
+{
+    while(DMA1_Stream3->NDTR != 0){};
+    if(tmp->Name[2] == 'w')
+    {
+        memcpy(&set_time_d_w_txt[9], day_of_week[tmp->Value-1], 9);
+
+        TFT_send(set_time_d_w_txt, sizeof(set_time_d_w_txt));
+    }
+    else
+    {
+        memcpy(set_time_txt, tmp->Name, 3);
+        
+        set_time_txt[9] = tmp->Value / 10                    + 0x30;
+        set_time_txt[10] = tmp->Value - (tmp->Value / 10)*10 + 0x30;
+        TFT_send(set_time_txt, sizeof(set_time_txt));
+    }
+}
+
+ /*-------Set time List. Send to TFT selected---------------*/
+/**---------------------------------------------------------**/
+void print_set_time_selet(Node_time *tmp)
+{
+    for(uint8_t i = 0;i < 6; i++)
+        set_time_select[8 + (i * 12)] = 0 + 0x30;
+    set_time_select[8 + (tmp->ID * 12)] = 1 + 0x30;
+    
+    TFT_send(set_time_select, sizeof(set_time_select));
+}
 /**=========================================================**/
  /*-----------Init Timer for key----------------------------*/
 /**---------------------------------------------------------**/
@@ -1382,29 +1361,45 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
             }
             case GLOBAL_STATE_SET_TIME:
             {
+                uint32_t tmp_time;
+
                 current_time = date_List->head;
+                tmp_time  = (current_time->Value/10 << RTC_TR_HT_Pos) |
+                            (current_time->Value - ((current_time->Value/10)*10)) << RTC_TR_HU_Pos;
+                
+                current_time = current_time->next;
+                tmp_time |= (current_time->Value/10 << RTC_TR_MNT_Pos) |
+                            (current_time->Value - ((current_time->Value/10)*10)) <<  RTC_TR_MNU_Pos;
+                
+                current_time = current_time->next;
+                
+                uint32_t tmp_date;
+                
+                tmp_date  = (current_time->Value/10 << RTC_DR_DT_Pos)  | 
+                            (current_time->Value - (current_time->Value/10)*10);
+                
+                current_time = current_time->next;
+                tmp_date |=  (current_time->Value/10 << RTC_DR_MT_Pos) | 
+                            ((current_time->Value  - ((current_time->Value/10)*10)) << RTC_DR_MU_Pos);
+                
+                current_time = current_time->next;
+                tmp_date |=  (current_time->Value/10 << RTC_DR_YT_Pos) | 
+                            ((current_time->Value  - ((current_time->Value/10)*10)) << RTC_DR_MU_Pos);
+                            
+                current_time = current_time->next;
+                tmp_date |=  current_time->Value << RTC_DR_WDU_Pos;
+                
+                current_time = NULL;
+                
                 RCC->APB1ENR |= RCC_APB1ENR_PWREN;
-                PWR->CR |= PWR_CR_DBP;
                 RTC->WPR = 0xCA;
                 RTC->WPR = 0x53;
                 RTC->ISR |= RTC_ISR_INIT;
                 while((RTC->ISR & RTC_ISR_INITF) == 0){};
-                RTC->TR  = (current_time->Value/10 << 20) |
-                           (current_time->Value - ((current_time->Value/10)*10)) << 16;
-                current_time = current_time->next;
-                RTC->TR |= (current_time->Value/10 << 12) |
-                           (current_time->Value - ((current_time->Value/10)*10)) <<  8;
-
-//                RTC->DR = (day/10 << 4)  | 
-//                          (day - (day/10)*10) | 
-//                          (mon/10 << 12) | 
-//                         ((mon - ((mon/10)*10)) << 8) | 
-//                          (year/10 << 20) |
-//                         ((year - ((year/10)*10)) << 16) |
-//                          (week_day << 13);
+                RTC->TR = tmp_time;
+                RTC->DR = tmp_date;
                 RTC->ISR &= ~RTC_ISR_INIT;
                 RTC->WPR = 0xFF;
-                PWR->CR &= ~PWR_CR_DBP;
                 
                 GLOBAL_STATE = PREVIOS_STATE;
                 TFT_send(pages[GLOBAL_STATE], sizeof(pages[GLOBAL_STATE]));
@@ -1515,7 +1510,7 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
         }
     }
     
-    if(BT_CLK_UP)
+    if((BT_CLK_UP)&&((GLOBAL_STATE == GLOBAL_STATE_MAIN)||GLOBAL_STATE == GLOBAL_STATE_AUDIO_OFF))
     {
         PREVIOS_STATE = GLOBAL_STATE;
         GLOBAL_STATE = GLOBAL_STATE_SET_TIME;
@@ -1549,8 +1544,6 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
         print_set_time_txt(current_time);
         
         current_time = date_List->head;
-        
-    
     }
     
     

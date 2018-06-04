@@ -216,29 +216,6 @@ uint8_t input_tft[4][32] = {{'i','n','p','.','t','x','t','=','"','F','M','"',255
                             {'i','n','p','.','t','x','t','=','"','U','S','B','"',255,255,255,'i','n','p','.','b','c','o','=','6','3','4','8','8',255,255,255},
                             {'i','n','p','.','t','x','t','=','"','A','U','X','"',255,255,255,'i','n','p','.','b','c','o','=','6','4','5','1','2',255,255,255},};
                                 
-//uint8_t set_time_tft[7][24] = {{'s','e','t','.','v','a','l','=','0',255,255,255,'t','_','h','.','v','a','l','=','1',255,255,255},
-//                               {'t','_','h','.','v','a','l','=','0',255,255,255,'t','_','m','.','v','a','l','=','1',255,255,255},
-//                               {'t','_','m','.','v','a','l','=','0',255,255,255,'d','_','y','.','v','a','l','=','1',255,255,255},
-//                               {'d','_','y','.','v','a','l','=','0',255,255,255,'d','_','m','.','v','a','l','=','1',255,255,255},
-//                               {'d','_','m','.','v','a','l','=','0',255,255,255,'d','_','d','.','v','a','l','=','1',255,255,255},
-//                               {'d','_','d','.','v','a','l','=','0',255,255,255,'d','_','w','.','v','a','l','=','1',255,255,255},
-//                               {'d','_','w','.','v','a','l','=','0',255,255,255,'s','e','t','.','v','a','l','=','1',255,255,255}};
-
-//uint8_t set_time_txt[97] = {'t','_','h','.','t','x','t','=','"','0','0','"',255,255,255,\
-//                            't','_','m','.','t','x','t','=','"','0','0','"',255,255,255,\
-//                            'd','_','m','.','t','x','t','=','"','0','0','"',255,255,255,\
-//                            'd','_','d','.','t','x','t','=','"','0','0','"',255,255,255,\
-//                            'd','_','y','.','t','x','t','=','"','0','0','"',255,255,255,\
-//                            'd','_','w','.','t','x','t','=','"','0','0','0','0','0','0','0','0','0','"',255,255,255,};
-
-uint8_t day_of_week[7][9] = {" Monday  ",
-                             " Tuesday ",
-                             "Wednesday",
-                             "Thursday ",
-                             " Friday  ",
-                             "Saturday ",
-                             " Sunday  "};
-
 uint8_t main_FM_text[22] = 	   {'t','e','x','t','.','t','x','t','=','"','0','0','0','.','0',' ','F','M','"',255,255,255};
 uint8_t main_BT_text[4][21] = {{'t','e','x','t','.','t','x','t','=','"',' ','N','O',' ','D','e','v','"',255,255,255},
 							   {'t','e','x','t','.','t','x','t','=','"','C','o','n','n','e','c','t','"',255,255,255},
@@ -378,6 +355,47 @@ uint8_t usb_play_mode  = 0;
 uint16_t ADC_Buff[ADC_BUF_NUM];
 
 /*-------------------------------------------------------*/
+/*                  Set time list                        */
+typedef struct _Node_time
+{
+    char Name[3];
+    uint8_t Value;
+    uint8_t MIN_value;
+    uint8_t MAX_value;
+    uint8_t ID;
+    struct _Node_time *next;
+    struct _Node_time *prev;
+} Node_time;
+
+typedef struct _List_time
+{
+    uint8_t size;
+    Node_time *head;
+    Node_time *tail;
+} List_time;
+
+uint8_t set_time_txt[15] = {'_','_','_','.','t','x','t','=','"','_','_','"',255,255,255};
+uint8_t set_time_d_w_txt[22] = {'d','_','w','.','t','x','t','=','"','_','_','_','_','_','_','_','_','_','"',255,255,255};
+    
+uint8_t set_time_select[72] = {'t','_','h','.','v','a','l','=','0',255,255,255,
+                               't','_','m','.','v','a','l','=','0',255,255,255,
+                               'd','_','d','.','v','a','l','=','0',255,255,255,
+                               'd','_','m','.','v','a','l','=','0',255,255,255,
+                               'd','_','y','.','v','a','l','=','0',255,255,255,
+                               'd','_','w','.','v','a','l','=','0',255,255,255};
+
+uint8_t day_of_week[7][9] = {" MONDAY  ",
+                             " TUESDAY ",
+                             "WEDNESDAY",
+                             "THURSDAY ",
+                             " FRIDAY  ",
+                             "SATURDAY ",
+                             " SUNDAY  "};
+
+List_time *date_List;
+Node_time *current_time;
+
+/*-------------------------------------------------------*/
 /*                  Global functions prototypes          */
 /*--                Interrupts Handlers                --*/
 //void TIM8_TRG_COM_TIM14_IRQHandler(void);         //Button parse timer interrupt
@@ -421,6 +439,11 @@ uint8_t Init_TDA(void);
 
 void Init_ADC(void);
 void Init_Pulse_IN(void);
+
+List_time* createList_time(void);
+void pushBack_time(List_time *list, char *name, uint8_t value, uint8_t min_value, uint8_t max_value);
+void print_set_time_txt(Node_time *tmp);
+void print_set_time_selet(Node_time *tmp);
 
 void TFT_switch_audio_input(void);
 void TFT_send_vol(void);
