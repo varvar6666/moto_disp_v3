@@ -128,48 +128,6 @@ enum AUDIO_INPUTs
 
 uint8_t AUDIO_INPUT;
 
-/*-------------------------------------------------------*/
-/*                  TODO: remake TDA config                 */
-enum TDA_SET_STATEs
-{
-    TDA_SET_LOUDNESS=0,
-    TDA_SET_TREB,
-    TDA_SET_MIDD,
-    TDA_SET_BASS,
-    TDA_SET_SPEAKER_ATT
-};
-
-enum TDA_SET_LOUD_STATEs
-{
-    TDA_SET_LOUD_CENT_FREQ=0,
-    TDA_SET_LOUD_ATTENUATION,
-    TDA_SET_LOUD_HIGN_BOOST
-};
-enum TDA_SET_TREB_STATEs
-{
-    TDA_SET_TREB_CENT_FREQ=0,
-    TDA_SET_TREB_ATTENUATION
-};
-enum TDA_SET_MIDD_STATEs
-{
-    TDA_SET_MIDD_CENT_FREQ=0,
-    TDA_SET_MIDD_ATTENUATION,
-    TDA_SET_MIDD_Q_FACTOR
-};
-enum TDA_SET_BASS_STATEs
-{
-    TDA_SET_BASS_CENT_FREQ=0,
-    TDA_SET_BASS_ATTENUATION,
-    TDA_SET_BASS_Q_FACTOR
-};
-enum TDA_SET_SATT_STATES
-{
-    TDA_SET_SATT_L_F=0,
-    TDA_SET_SATT_R_F,
-    TDA_SET_SATT_L_R,
-    TDA_SET_SATT_R_R
-};
-
 
 /*-------------------------------------------------------*/
 /*                  TDA Defines TODO: CHECK                         */
@@ -183,12 +141,12 @@ enum TDA_SET_SATT_STATES
 #define TDA_MIDDLE_FILTER   0x0A
 #define TDA_BASS_FILTER     0x0B
 #define TDA_SUB_M_B         0x0C
-#define TDA_SPEAKER_ATT_LF  0x0D
-#define TDA_SPEAKER_ATT_RF  0x0E
-#define TDA_SPEAKER_ATT_LR  0x0F
+#define TDA_SPEAKER_ATT_FL  0x0D
+#define TDA_SPEAKER_ATT_FR  0x0E
+#define TDA_SPEAKER_ATT_RL  0x0F
 #define TDA_SPEAKER_ATT_RR  0x10
-#define TDA_SPEAKER_ATT_SL  0x11
-#define TDA_SPEAKER_ATT_SR  0x12
+#define TDA_SPEAKER_ATT_SWL 0x11
+#define TDA_SPEAKER_ATT_SWR 0x12
 
 #define TDA_SOURCE_MUTE		0x07
 //                             FM,   BT,   USB,  AUX
@@ -209,7 +167,7 @@ uint8_t TFT_TIME[63] = {'t','i','m','e','.','t','x','t','=','"',0,0,':',0,0,'"',
 uint8_t pages[4][12] = {{'p','a','g','e',' ','l','o','a','d',255,255,255},
                         {'p','a','g','e',' ','a','o','f','f',255,255,255},
                         {'p','a','g','e',' ','m','a','i','n',255,255,255},
-                        {'p','a','g','e',' ','s','e','t','t',255,255,255}};
+                        {'p','a','g','e',' ','s','e','t','t',255,255,255},};
 
 uint8_t input_tft[4][32] = {{'i','n','p','.','t','x','t','=','"','F','M','"',255,255,255,'i','n','p','.','b','c','o','=','0','3','4','8','1','5',255,255,255},
                             {'i','n','p','.','t','x','t','=','"','B','T','"',255,255,255,'i','n','p','.','b','c','o','=','0','1','4','8','4','7',255,255,255},
@@ -236,11 +194,7 @@ uint8_t main_text_font_7[14] = {'t','e','x','t','.','f','o','n','t','=','7',255,
 	
 uint8_t ADC_text[25] = {'A','D','C','.','t','x','t','=','"','0','0','.','0','V',' ',' ',' ','0','0','0','%','"',255,255,255};
     
-uint8_t tda_sett_pages[5][20] = {{'p','a','g','e',' ','t','d','a','_','l','o','u','d',255,255,255},
-                                 {'p','a','g','e',' ','t','d','a','_','t','r','e','b',255,255,255},
-                                 {'p','a','g','e',' ','t','d','a','_','m','i','d','d',255,255,255},
-                                 {'p','a','g','e',' ','t','d','a','_','b','a','s','s',255,255,255},
-                                 {'p','a','g','e',' ','t','d','a','_','s','a','t','t',255,255,255}};
+
 
 uint8_t tda_set_LTMB[3][48] = {{'a','t','t','.','b','c','o','=','6','5','5','3','5',255,255,255,'h','_','q','.','b','c','o','=','6','5','5','3','5',255,255,255,'c','_','f','.','b','c','o','=','6','3','4','8','8',255,255,255},
                                {'h','_','q','.','b','c','o','=','6','5','5','3','5',255,255,255,'c','_','f','.','b','c','o','=','6','5','5','3','5',255,255,255,'a','t','t','.','b','c','o','=','6','3','4','8','8',255,255,255},
@@ -363,6 +317,8 @@ typedef struct _Node_time
     uint8_t MIN_value;
     uint8_t MAX_value;
     uint8_t ID;
+    void (*Send_to_TFT_fnc)();
+    void (*Send_select_TFT_fnc)();
     struct _Node_time *next;
     struct _Node_time *prev;
 } Node_time;
@@ -441,7 +397,7 @@ void Init_ADC(void);
 void Init_Pulse_IN(void);
 
 List_time* createList_time(void);
-void pushBack_time(List_time *list, char *name, uint8_t value, uint8_t min_value, uint8_t max_value);
+void pushBack_time(List_time *list, char *name, uint8_t value, uint8_t min_value, uint8_t max_value, void (*send_to_TFT_fnc)(), void (*send_select_TFT_fnc)());
 void print_set_time_txt(Node_time *tmp);
 void print_set_time_selet(Node_time *tmp);
 
