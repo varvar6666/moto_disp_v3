@@ -23,6 +23,7 @@ uint8_t I2C_res, USB_res;
 uint16_t RADIO_FREQ = 1040;
 
 int8_t VOLUME = 0;
+uint8_t MUTED = 0;
 
 uint32_t RawFreq;
 uint32_t truefreq = 0;
@@ -1688,6 +1689,63 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
         {
             case GLOBAL_STATE_MAIN:
             {
+                switch (AUDIO_INPUT)
+                {
+                    case AUDIO_BT:
+                    {
+                        BT_send(BT_PLAY_PAUSE);
+                        break;
+                    }
+                    case AUDIO_USB:
+                    {
+                        if(usb_status == USB_PLAY)
+                        {
+                            USB_send(USB_CMD_PAUSE);
+                            usb_status = USB_PAUSE;
+                            
+                            main_USB_text[30] = 'P';
+                            main_USB_text[31] = 'A';
+                            main_USB_text[32] = 'U';
+                            main_USB_text[33] = 'S';
+                            main_USB_text[34] = 'E';
+                            
+                            TFT_send(main_USB_text, sizeof(main_USB_text));
+                        }
+                        else
+                        {
+                            USB_send(USB_CMD_PLAY);
+                            usb_status = USB_PLAY;
+                            
+                            main_USB_text[30] = 'P';
+                            main_USB_text[31] = 'L';
+                            main_USB_text[32] = 'A';
+                            main_USB_text[33] = 'Y';
+                            main_USB_text[34] = ' ';
+                            
+                            TFT_send(main_USB_text, sizeof(main_USB_text));
+                        }
+                        break;
+                    }
+                    case AUDIO_FM:
+                    case AUDIO_AUX:
+                    {
+                        if(MUTED)
+                        {
+                            MUTED = 0;
+                            UNMUTE;
+                            
+                            TFT_send(main_VOL_text, sizeof(main_VOL_text));
+                        }
+                        else
+                        {
+                            MUTED = 1;
+                            MUTE;
+                            
+                            TFT_send(main_VOL_mute, sizeof(main_VOL_mute));
+                        }
+                   }
+
+                }
                 break;
             }
             case GLOBAL_STATE_SET_TIME:
@@ -1755,6 +1813,80 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
         {
             case GLOBAL_STATE_MAIN:
             {
+                switch (AUDIO_INPUT)
+                {
+                    case AUDIO_FM:
+                    {
+                        RADIO_FREQ++;
+                        if(RADIO_FREQ >= 1090)RADIO_FREQ = 850;
+                        TEA_set_freq(RADIO_FREQ);
+                        
+                        flash_write_newdata_main();
+        
+                        main_FM_text[10] =  RADIO_FREQ/1000 + 0x30;
+                        main_FM_text[11] = (RADIO_FREQ -(RADIO_FREQ/1000)*1000)/100 + 0x30;
+                        main_FM_text[12] = (RADIO_FREQ -(RADIO_FREQ/100)*100)/10 + 0x30;
+                        main_FM_text[14] = (RADIO_FREQ -(RADIO_FREQ/10)*10) + 0x30;
+                        
+                        TFT_send(main_FM_text, sizeof(main_FM_text));
+                        break;
+                    }
+                    case AUDIO_BT:
+                    {
+                        BT_send(BT_FORWARD);
+                        break;
+                    }
+                    case AUDIO_USB:
+                    {
+                        usb_status = USB_PLAY;
+                    
+                        USB_send(USB_CMD_NEXT);
+                        
+                        USB_send(USB_Q_TRACK_NUMBER);
+                        USB_send(USB_Q_TRACK_NAME);
+                        USB_send(USB_Q_STATUS);
+                            
+                        main_USB_text[10] =  usb_track_info.num/100 + 0x30;
+                        main_USB_text[11] = (usb_track_info.num -(usb_track_info.num/100)*100)/10 + 0x30;
+                        main_USB_text[12] = (usb_track_info.num -(usb_track_info.num/10)*10) + 0x30;
+/*                    
+                        main_USB_text[35] =  (usb_track_info.tlong/60)/10 + 0x30;
+                        main_USB_text[36] = ((usb_track_info.tlong/60) -((usb_track_info.tlong/60)/10)*10) + 0x30;
+                        main_USB_text[38] =  (usb_track_info.tlong-((usb_track_info.tlong/60)*60))/10 + 0x30;
+                        main_USB_text[39] = ((usb_track_info.tlong-((usb_track_info.tlong/60)*60)) -((usb_track_info.tlong-((usb_track_info.tlong/60)*60))/10)*10) + 0x30;
+                    
+                        main_USB_text[25] =  (usb_track_info.time/60)/10 + 0x30;
+                        main_USB_text[26] = ((usb_track_info.time/60) -((usb_track_info.time/60)/10)*10) + 0x30;
+                        main_USB_text[28] =  (usb_track_info.time-((usb_track_info.time/60)*60))/10 + 0x30;
+                        main_USB_text[29] = ((usb_track_info.time-((usb_track_info.time/60)*60)) -((usb_track_info.time-((usb_track_info.time/60)*60))/10)*10) + 0x30;
+ */                       
+                        main_USB_text[18] = usb_track_info.name[0];
+                        main_USB_text[19] = usb_track_info.name[1];
+                        main_USB_text[20] = usb_track_info.name[2];
+                        main_USB_text[21] = usb_track_info.name[3];
+                        main_USB_text[22] = usb_track_info.name[4];
+                        main_USB_text[23] = usb_track_info.name[5];
+                        
+                        if(usb_status == 1)
+                        {
+                            main_USB_text[30] = 'P';
+                            main_USB_text[31] = 'L';
+                            main_USB_text[32] = 'A';
+                            main_USB_text[33] = 'Y';
+                            main_USB_text[34] = ' ';
+                        }else if(usb_status == 2)
+                        {
+                            main_USB_text[30] = 'P';
+                            main_USB_text[31] = 'A';
+                            main_USB_text[32] = 'U';
+                            main_USB_text[33] = 'S';
+                            main_USB_text[34] = 'E';
+                        }
+                    
+                        TFT_send(main_USB_text, sizeof(main_USB_text));
+                    break;
+                    }
+                }
                 break;
             }
             case GLOBAL_STATE_SET_TIME:
@@ -1785,6 +1917,80 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
         {
             case GLOBAL_STATE_MAIN:
             {
+                switch (AUDIO_INPUT)
+                {
+                    case AUDIO_FM:
+                    {
+                        RADIO_FREQ--;
+                        if(RADIO_FREQ <= 850)RADIO_FREQ = 1080;
+                        TEA_set_freq(RADIO_FREQ);
+                        
+                        flash_write_newdata_main();
+        
+                        main_FM_text[10] =  RADIO_FREQ/1000 + 0x30;
+                        main_FM_text[11] = (RADIO_FREQ -(RADIO_FREQ/1000)*1000)/100 + 0x30;
+                        main_FM_text[12] = (RADIO_FREQ -(RADIO_FREQ/100)*100)/10 + 0x30;
+                        main_FM_text[14] = (RADIO_FREQ -(RADIO_FREQ/10)*10) + 0x30;
+                        
+                        TFT_send(main_FM_text, sizeof(main_FM_text));
+                        break;
+                    }
+                    case AUDIO_BT:
+                    {
+                        BT_send(BT_FORWARD);
+                        break;
+                    }
+                    case AUDIO_USB:
+                    {
+                        usb_status = USB_PLAY;
+                    
+                        USB_send(USB_CMD_NEXT);
+                        
+                        USB_send(USB_Q_TRACK_NUMBER);
+                        USB_send(USB_Q_TRACK_NAME);
+                        USB_send(USB_Q_STATUS);
+                            
+                        main_USB_text[10] =  usb_track_info.num/100 + 0x30;
+                        main_USB_text[11] = (usb_track_info.num -(usb_track_info.num/100)*100)/10 + 0x30;
+                        main_USB_text[12] = (usb_track_info.num -(usb_track_info.num/10)*10) + 0x30;
+/*                    
+                        main_USB_text[35] =  (usb_track_info.tlong/60)/10 + 0x30;
+                        main_USB_text[36] = ((usb_track_info.tlong/60) -((usb_track_info.tlong/60)/10)*10) + 0x30;
+                        main_USB_text[38] =  (usb_track_info.tlong-((usb_track_info.tlong/60)*60))/10 + 0x30;
+                        main_USB_text[39] = ((usb_track_info.tlong-((usb_track_info.tlong/60)*60)) -((usb_track_info.tlong-((usb_track_info.tlong/60)*60))/10)*10) + 0x30;
+                    
+                        main_USB_text[25] =  (usb_track_info.time/60)/10 + 0x30;
+                        main_USB_text[26] = ((usb_track_info.time/60) -((usb_track_info.time/60)/10)*10) + 0x30;
+                        main_USB_text[28] =  (usb_track_info.time-((usb_track_info.time/60)*60))/10 + 0x30;
+                        main_USB_text[29] = ((usb_track_info.time-((usb_track_info.time/60)*60)) -((usb_track_info.time-((usb_track_info.time/60)*60))/10)*10) + 0x30;
+ */                       
+                        main_USB_text[18] = usb_track_info.name[0];
+                        main_USB_text[19] = usb_track_info.name[1];
+                        main_USB_text[20] = usb_track_info.name[2];
+                        main_USB_text[21] = usb_track_info.name[3];
+                        main_USB_text[22] = usb_track_info.name[4];
+                        main_USB_text[23] = usb_track_info.name[5];
+                        
+                        if(usb_status == 1)
+                        {
+                            main_USB_text[30] = 'P';
+                            main_USB_text[31] = 'L';
+                            main_USB_text[32] = 'A';
+                            main_USB_text[33] = 'Y';
+                            main_USB_text[34] = ' ';
+                        }else if(usb_status == 2)
+                        {
+                            main_USB_text[30] = 'P';
+                            main_USB_text[31] = 'A';
+                            main_USB_text[32] = 'U';
+                            main_USB_text[33] = 'S';
+                            main_USB_text[34] = 'E';
+                        }
+                    
+                        TFT_send(main_USB_text, sizeof(main_USB_text));
+                    break;
+                    }
+                }
                 break;
             }
             case GLOBAL_STATE_SET_TIME:
