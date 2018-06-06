@@ -1813,6 +1813,10 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
             }
             case GLOBAL_STATE_TDA_SETT:
             {
+                if(current_SubTDA->Value < current_SubTDA->MAX_value)
+                    current_SubTDA->Value++;
+                current_TDA->SubList->I2C_send_fnc(current_TDA->SubList);
+                current_SubTDA->Send_TFT_txt_fnc(current_SubTDA);
                 break;
             }
         }
@@ -1836,6 +1840,10 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
             }
             case GLOBAL_STATE_TDA_SETT:
             {
+                if(current_SubTDA->Value > current_SubTDA->MIN_value)
+                    current_SubTDA->Value--;
+                current_TDA->SubList->I2C_send_fnc(current_TDA->SubList);
+                current_SubTDA->Send_TFT_txt_fnc(current_SubTDA);
                 break;
             }
         }
