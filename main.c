@@ -27,292 +27,7 @@ int8_t VOLUME = 0;
 uint32_t RawFreq;
 uint32_t truefreq = 0;
 uint8_t Flag = 0;
-
-typedef struct _SubNode_TDA
-{
-    char Name[3];
-    int8_t Value;
-    int8_t MIN_value;
-    int8_t MAX_value;
-    uint8_t Pos;
-    uint8_t ID;
-    void (*Send_TFT_txt_fnc)();
-    uint8_t *TFT_buff;
-    void (*Send_select_TFT_fnc)();
-    struct _SubNode_TDA *next;
-    struct _SubNode_TDA *prev;
-} SubNode_TDA;
-
-typedef struct _SubList_TDA
-{
-    uint8_t size;
-    uint8_t I2C_sub_address;
-    uint8_t (*I2C_send_fnc)();
-    SubNode_TDA *head;
-    SubNode_TDA *tail;
-} SubList_TDA;
-
-SubList_TDA* createSubList_TDA(uint8_t (*i2c_send_fnc)(), uint8_t i2c_sub_address)
-{
-    SubList_TDA *tmp = (SubList_TDA*)malloc(sizeof(SubList_TDA));
-    tmp->size = 0;
-    tmp->I2C_sub_address = i2c_sub_address;
-    tmp->I2C_send_fnc = i2c_send_fnc;
-    tmp->head = tmp->tail = NULL;
-    return tmp;
-}
-
-void pushBack_SubTDA(SubList_TDA *list, char *name, int8_t value, int8_t min_value, int8_t max_value, uint8_t pos, void (*send_TFT_txt_fnc)(), uint8_t *tft_buff, void (*send_select_TFT_fnc)())
-{
-    SubNode_TDA *tmp = (SubNode_TDA*) malloc(sizeof(SubNode_TDA));
-    if(tmp == NULL)
-    {
-        exit(3);
-    }
-    memcpy(tmp->Name, name, 3);
-    tmp->Value = value;
-    tmp->MIN_value = min_value;
-    tmp->MAX_value = max_value;
-    tmp->Pos = pos;
-    tmp->Send_TFT_txt_fnc = send_TFT_txt_fnc;
-    tmp->TFT_buff = tft_buff;
-    tmp->Send_select_TFT_fnc = send_select_TFT_fnc;
-    tmp->ID = list->size;
-
-    tmp->next = NULL;
-    
-    tmp->prev = list->tail;
-    if (list->tail) {
-        list->tail->next = tmp;
-    }
-    list->tail = tmp;
- 
-    if (list->head == NULL) {
-        list->head = tmp;
-    }
-    list->size++;
-}
-
-typedef struct _Node_TDA
-{
-    char Name[8];
-    uint8_t ID;
-    SubList_TDA *SubList;
-    void (*Select_TFT_page_fnc)();
-    struct _Node_TDA *next;
-} Node_TDA;
-
-typedef struct _List_TDA
-{
-    uint8_t size;
-    Node_TDA *head;
-    Node_TDA *tail;
-} List_TDA;
-
-List_TDA* createList_TDA()
-{
-    List_TDA *tmp = (List_TDA*)malloc(sizeof(List_TDA));
-    tmp->size = 0;
-    tmp->head = tmp->tail = NULL;
-    return tmp;
-}
-
-void pushBack_TDA(List_TDA *list, char *name, SubList_TDA *subList, void (*select_TFT_page_fnc)())
-{
-    Node_TDA *tmp = (Node_TDA*) malloc(sizeof(Node_TDA));
-    if(tmp == NULL)
-    {
-        exit(3);
-    }
-    memcpy(tmp->Name, name, 8);
-    tmp->SubList = subList;
-    tmp->Select_TFT_page_fnc = select_TFT_page_fnc;
-    tmp->ID = list->size;
-
-    tmp->next = NULL;
-    
-    if (list->tail) {
-        list->tail->next = tmp;
-    }
-    list->tail = tmp;
- 
-    if (list->head == NULL) {
-        list->head = tmp;
-    }
-    list->size++;
-}
-
-uint8_t I2C_send_Loudness(SubList_TDA *tmp)
-{
-    uint8_t i2c_buff[2] = {tmp->I2C_sub_address, 0};
-    SubNode_TDA *SubNode_tmp = tmp->head;
-    
-    i2c_buff[1] = -(SubNode_tmp->Value) << SubNode_tmp->Pos;
-    
-    SubNode_tmp = SubNode_tmp->next;
-    i2c_buff[1] |= SubNode_tmp->Value << SubNode_tmp->Pos;
-    
-    SubNode_tmp = SubNode_tmp->next;
-    i2c_buff[1] |= SubNode_tmp->Value << SubNode_tmp->Pos;
-
-    return I2C1_Send(TDA7718_ADDRESS, i2c_buff, 2);
-}
-
-uint8_t I2C_send_Trebl_Mid_Bass(SubList_TDA *tmp)
-{
-    uint8_t i2c_buff[2] = {tmp->I2C_sub_address, 0};
-    SubNode_TDA *SubNode_tmp = tmp->head;
-    
-    i2c_buff[1] = (SubNode_tmp->Value > 0) ? (31 - SubNode_tmp->Value) : (SubNode_tmp->Value + 15);
-    
-    SubNode_tmp = SubNode_tmp->next;
-    i2c_buff[1] |= SubNode_tmp->Value << SubNode_tmp->Pos;
-    
-    return I2C1_Send(TDA7718_ADDRESS, i2c_buff, 2);
-}
-
-uint8_t I2C_send_Sub_Mid_Bass(SubList_TDA *tmp)
-{
-    uint8_t i2c_buff[2] = {tmp->I2C_sub_address, 0};
-    SubNode_TDA *SubNode_tmp = tmp->head;
-    
-    i2c_buff[1]  = SubNode_tmp->Value << SubNode_tmp->Pos;
-    
-    SubNode_tmp = SubNode_tmp->next;
-    i2c_buff[1] |= SubNode_tmp->Value << SubNode_tmp->Pos;
-    
-    SubNode_tmp = SubNode_tmp->next;
-    i2c_buff[1] |= SubNode_tmp->Value << SubNode_tmp->Pos;
-    
-    return I2C1_Send(TDA7718_ADDRESS, i2c_buff, 2);
-}
-
-uint8_t I2C_send_Speaker_Attenuation(SubList_TDA *tmp)
-{
-    uint8_t i2c_buff[2] = {tmp->I2C_sub_address + tmp->head->Pos, (tmp->head->Value > 0) ? (tmp->head->Value) : (16 - tmp->head->Value)};
-    
-    return I2C1_Send(TDA7718_ADDRESS, i2c_buff, 2);
-}
-
-
-uint8_t tda_attenuation_txt[16] = {'a','t','t','.','t','x','t','=','"','-','_','_','"',255,255,255};
-uint8_t tda_c_f_h_q_txt[17] = {'c','_','f','.','t','x','t','=','"','_','_','_','_','"',255,255,255};
-//uint8_t tda_h_q_txt[16]         = {'h','_','q','.','t','x','t','=','"','_','_','_','"',255,255,255};
-
-uint8_t loudness_cent_freq[4][4] = {{'F','L','A','T'},\
-                                    {' ','4','0','0'},\
-                                    {' ','8','0','0'},\
-                                    {'2','4','0','0'}};
-uint8_t loudness_high_boost[2][4]= {{' ','O','N',' '},\
-                                    {'O','F','F',' '}};
-
-uint8_t treble_cent_freq[4][4] = {{'1','0','.','0'},\
-                                  {'1','2','.','5'},\
-                                  {'1','5','.','0'},\
-                                  {'1','7','.','5'}};
-
-uint8_t middle_q_factor[3][4] = {{'1','.','0',' '},\
-                                 {'1','.','2','5'},\
-                                 {'2','.','0',' '}};
-
-uint8_t  bass_q_factor[4][4] = {{'1','.','0',' '},\
-                                {'1','.','2','5'},\
-                                {'1','.','5',' '},\
-                                {'2','.','0',' '}};
-
-uint8_t  sub_cut_off_freq[4][4] = {{' ','5','5',' '},\
-                                   {' ','8','5',' '},\
-                                   {'1','2','0',' '},\
-                                   {'1','6','0',' '}};
-
-uint8_t  middle_cent_freq[4][4] = {{'0','5','0','0'},\
-                                   {'1','0','0','0'},\
-                                   {'1','5','0','0'},\
-                                   {'2','5','0','0'}};
-
- uint8_t  bass_cent_freq[4][4] = {{'0','6','0',' '},\
-                                  {'0','8','0',' '},\
-                                  {'1','0','0',' '},\
-                                  {'2','0','0',' '}};                                  
-
-void print_TDA_att_txt(SubNode_TDA *tmp)
-{
-    while(DMA1_Stream3->NDTR != 0){};
-
-    memcpy(tda_attenuation_txt, tmp->Name, 3);
-    
-    tda_attenuation_txt[9] =   (tmp->Value > 0) ? ('+') : ('-');
-    tda_attenuation_txt[10] = ((tmp->Value > 0) ? (tmp->Value / 10) : (-tmp->Value / 10)) + 0x30;
-    tda_attenuation_txt[11] = ((tmp->Value > 0) ? (tmp->Value-((tmp->Value/10)*10)) : (-tmp->Value-((-tmp->Value/10)*10))) + 0x30;
-    TFT_send(tda_attenuation_txt, sizeof(tda_attenuation_txt));
-}
-
-void print_TDA_txt(SubNode_TDA *tmp)
-{
-    while(DMA1_Stream3->NDTR != 0){};
-
-    memcpy(tda_c_f_h_q_txt, tmp->Name, 3);
-        
-    memcpy(&tda_c_f_h_q_txt[9], &tmp->TFT_buff[tmp->Value*4], 4);
-
-    TFT_send(tda_c_f_h_q_txt, sizeof(tda_c_f_h_q_txt));
-}
-
-//void print_TDA_h_q_txt(SubNode_TDA *tmp)
-//{
-//    while(DMA1_Stream3->NDTR != 0){};
-
-//    memcpy(tda_h_q_txt, tmp->Name, 3);
-//    
-//    memcpy(&tda_h_q_txt[9], &tmp->TFT_buff[tmp->Value*3], 3);
-
-//    TFT_send(tda_h_q_txt, sizeof(tda_h_q_txt));
-//}
-
-uint8_t tda_select_2[24] = {'_','_','_','.','v','a','l','=','0',255,255,255,
-                            '_','_','_','.','v','a','l','=','0',255,255,255};
-uint8_t tda_select_3[36] = {'_','_','_','.','v','a','l','=','0',255,255,255,
-                            '_','_','_','.','v','a','l','=','0',255,255,255,
-                            '_','_','_','.','v','a','l','=','0',255,255,255};
-void print_TDA_selet(SubList_TDA *list, SubNode_TDA *node)
-{
-    SubNode_TDA *tmp = list->head;
-    if(list->size == 2)
-    {
-        for(uint8_t i = 0;i<list->size;i++)
-        {
-            memcpy(&tda_select_2[i * 12], tmp->Name, 3);
-            tda_select_2[8 + (i * 12)] = 0 + 0x30;
-            tmp = tmp->next;
-        }
-        tda_select_2[8 + (node->ID * 12)] = 1 + 0x30;
-        TFT_send(tda_select_2, sizeof(tda_select_2));        
-    }
-    else if(list->size == 3)
-    {
-        for(uint8_t i = 0;i<list->size;i++)
-        {
-            memcpy(&tda_select_3[i * 12], tmp->Name, 3);
-            tda_select_3[8 + (i * 12)] = 0 + 0x30;
-            tmp = tmp->next;
-        }
-        tda_select_3[8 + (node->ID * 12)] = 1 + 0x30;
-        TFT_send(tda_select_3, sizeof(tda_select_3));        
-    }
-}
-uint8_t tda_select_page[16] = {'p','a','g','e',' ','_','_','_','_','_','_','_','_',255,255,255};
-void print_TDA_selet_page(Node_TDA *tmp)
-{
-    memcpy(&tda_select_page[5], tmp->Name, 8);
-    
-    TFT_send(tda_select_page, sizeof(tda_select_page));
-}
-
-SubList_TDA *SubList_TDA_Loudness, *SubList_TDA_Treble, *SubList_TDA_Middle, *SubList_TDA_Bass, *SubList_TDA_Sub_Mid_Bass;
-List_TDA *List_TDA7718;
-Node_TDA *current_TDA;
-SubNode_TDA *current_SubTDA;
-
+             
 int main(void)
 {   
 /**---------------------------------------------------------**/
@@ -460,10 +175,18 @@ int main(void)
     pushBack_SubTDA(SubList_TDA_Bass, "att", 1, -15, 15, 0, print_TDA_att_txt, NULL, print_TDA_selet);
     pushBack_SubTDA(SubList_TDA_Bass, "h_q", 3,   0,  3, 5, print_TDA_txt, bass_q_factor[0], print_TDA_selet);
     
-    SubList_TDA_Sub_Mid_Bass = createSubList_TDA(&I2C_send_Sub_Mid_Bass, TDA_MIDDLE_FILTER);
+    SubList_TDA_Sub_Mid_Bass = createSubList_TDA(&I2C_send_Sub_Mid_Bass, TDA_SUB_M_B);
     pushBack_SubTDA(SubList_TDA_Sub_Mid_Bass, "sco", 2, 0, 3, 0, print_TDA_txt, sub_cut_off_freq[0], print_TDA_selet);
     pushBack_SubTDA(SubList_TDA_Sub_Mid_Bass, "mcf", 3, 0, 3, 3, print_TDA_txt, middle_cent_freq[0], print_TDA_selet);
     pushBack_SubTDA(SubList_TDA_Sub_Mid_Bass, "bcf", 3, 0, 3, 5, print_TDA_txt, bass_cent_freq[0], print_TDA_selet);
+    
+    SubList_TDA_Speaker_Att = createSubList_TDA(&I2C_send_Speaker_Attenuation, TDA_SPEAKER_ATT_FL);
+    pushBack_SubTDA(SubList_TDA_Speaker_Att, "f_l", 0, -79, 15, 0, print_TDA_att_txt, NULL, print_TDA_selet);
+    pushBack_SubTDA(SubList_TDA_Speaker_Att, "f_r", 0, -79, 15, 1, print_TDA_att_txt, NULL, print_TDA_selet);
+    pushBack_SubTDA(SubList_TDA_Speaker_Att, "r_l", 0, -79, 15, 2, print_TDA_att_txt, NULL, print_TDA_selet);
+    pushBack_SubTDA(SubList_TDA_Speaker_Att, "r_r", 0, -79, 15, 3, print_TDA_att_txt, NULL, print_TDA_selet);
+    pushBack_SubTDA(SubList_TDA_Speaker_Att, "swl", 0, -79, 15, 4, print_TDA_att_txt, NULL, print_TDA_selet);
+    pushBack_SubTDA(SubList_TDA_Speaker_Att, "swr", 0, -79, 15, 5, print_TDA_att_txt, NULL, print_TDA_selet);
     
     
     List_TDA7718 = createList_TDA();
@@ -472,6 +195,7 @@ int main(void)
     pushBack_TDA(List_TDA7718, "tda_midd", SubList_TDA_Middle,       print_TDA_selet_page);
     pushBack_TDA(List_TDA7718, "tda_bass", SubList_TDA_Bass,         print_TDA_selet_page);
     pushBack_TDA(List_TDA7718, "tda_subw", SubList_TDA_Sub_Mid_Bass, print_TDA_selet_page);
+    pushBack_TDA(List_TDA7718, "tda_satt", SubList_TDA_Speaker_Att,  print_TDA_selet_page);
     
     current_TDA = List_TDA7718->head;
     current_SubTDA = current_TDA->SubList->head;
@@ -1580,6 +1304,221 @@ void print_set_time_selet(Node_time *tmp)
     
     TFT_send(set_time_select, sizeof(set_time_select));
 }
+
+/**=========================================================**/
+ /*--------------------TDA Lists----------------------------*/
+ /*----------------Create Sublist for elements--------------*/
+/**---------------------------------------------------------**/
+SubList_TDA* createSubList_TDA(uint8_t (*i2c_send_fnc)(), uint8_t i2c_sub_address)
+{
+    SubList_TDA *tmp = (SubList_TDA*)malloc(sizeof(SubList_TDA));
+    tmp->size = 0;
+    tmp->I2C_sub_address = i2c_sub_address;
+    tmp->I2C_send_fnc = i2c_send_fnc;
+    tmp->head = tmp->tail = NULL;
+    return tmp;
+}
+
+ /*----------Add item to end of sublist---------------------*/
+/**---------------------------------------------------------**/
+void pushBack_SubTDA(SubList_TDA *list, char *name, int8_t value, int8_t min_value, int8_t max_value, uint8_t pos, void (*send_TFT_txt_fnc)(), uint8_t *tft_buff, void (*send_select_TFT_fnc)())
+{
+    SubNode_TDA *tmp = (SubNode_TDA*) malloc(sizeof(SubNode_TDA));
+    if(tmp == NULL)
+    {
+        exit(3);
+    }
+    memcpy(tmp->Name, name, 3);
+    tmp->Value = value;
+    tmp->MIN_value = min_value;
+    tmp->MAX_value = max_value;
+    tmp->Pos = pos;
+    tmp->Send_TFT_txt_fnc = send_TFT_txt_fnc;
+    tmp->TFT_buff = tft_buff;
+    tmp->Send_select_TFT_fnc = send_select_TFT_fnc;
+    tmp->ID = list->size;
+
+    tmp->next = NULL;
+    
+    tmp->prev = list->tail;
+    if (list->tail) {
+        list->tail->next = tmp;
+    }
+    list->tail = tmp;
+ 
+    if (list->head == NULL) {
+        list->head = tmp;
+    }
+    list->size++;
+}
+
+ /*--------------Create main TDA List-----------------------*/
+/**---------------------------------------------------------**/
+List_TDA* createList_TDA(void)
+{
+    List_TDA *tmp = (List_TDA*)malloc(sizeof(List_TDA));
+    tmp->size = 0;
+    tmp->head = tmp->tail = NULL;
+    return tmp;
+}
+
+ /*-------------Add item to end TDA list--------------------*/
+/**---------------------------------------------------------**/
+void pushBack_TDA(List_TDA *list, char *name, SubList_TDA *subList, void (*select_TFT_page_fnc)())
+{
+    Node_TDA *tmp = (Node_TDA*) malloc(sizeof(Node_TDA));
+    if(tmp == NULL)
+    {
+        exit(3);
+    }
+    memcpy(tmp->Name, name, 8);
+    tmp->SubList = subList;
+    tmp->Select_TFT_page_fnc = select_TFT_page_fnc;
+    tmp->ID = list->size;
+
+    tmp->next = NULL;
+    
+    if (list->tail) {
+        list->tail->next = tmp;
+    }
+    list->tail = tmp;
+ 
+    if (list->head == NULL) {
+        list->head = tmp;
+    }
+    list->size++;
+}
+
+
+
+ /*---Functions fot send data to TDA via I2C----------------*/
+/**---------------------------------------------------------**/
+uint8_t I2C_send_Loudness(SubList_TDA *tmp)
+{
+    uint8_t i2c_buff[2] = {tmp->I2C_sub_address, 0};
+    SubNode_TDA *SubNode_tmp = tmp->head;
+    
+    i2c_buff[1] = -(SubNode_tmp->Value) << SubNode_tmp->Pos;
+    
+    SubNode_tmp = SubNode_tmp->next;
+    i2c_buff[1] |= SubNode_tmp->Value << SubNode_tmp->Pos;
+    
+    SubNode_tmp = SubNode_tmp->next;
+    i2c_buff[1] |= SubNode_tmp->Value << SubNode_tmp->Pos;
+
+    return I2C1_Send(TDA7718_ADDRESS, i2c_buff, 2);
+}
+
+uint8_t I2C_send_Trebl_Mid_Bass(SubList_TDA *tmp)
+{
+    uint8_t i2c_buff[2] = {tmp->I2C_sub_address, 0};
+    SubNode_TDA *SubNode_tmp = tmp->head;
+    
+    i2c_buff[1] = (SubNode_tmp->Value > 0) ? (31 - SubNode_tmp->Value) : (SubNode_tmp->Value + 15);
+    
+    SubNode_tmp = SubNode_tmp->next;
+    i2c_buff[1] |= SubNode_tmp->Value << SubNode_tmp->Pos;
+    
+    return I2C1_Send(TDA7718_ADDRESS, i2c_buff, 2);
+}
+
+uint8_t I2C_send_Sub_Mid_Bass(SubList_TDA *tmp)
+{
+    uint8_t i2c_buff[2] = {tmp->I2C_sub_address, 0};
+    SubNode_TDA *SubNode_tmp = tmp->head;
+    
+    i2c_buff[1]  = SubNode_tmp->Value << SubNode_tmp->Pos;
+    
+    SubNode_tmp = SubNode_tmp->next;
+    i2c_buff[1] |= SubNode_tmp->Value << SubNode_tmp->Pos;
+    
+    SubNode_tmp = SubNode_tmp->next;
+    i2c_buff[1] |= SubNode_tmp->Value << SubNode_tmp->Pos;
+    
+    return I2C1_Send(TDA7718_ADDRESS, i2c_buff, 2);
+}
+
+uint8_t I2C_send_Speaker_Attenuation(SubList_TDA *list, SubNode_TDA *node)
+{
+    uint8_t i2c_buff[2] = {list->I2C_sub_address + node->Pos, (node->Value > 0) ? (node->Value) : (16 - node->Value)};
+    
+    return I2C1_Send(TDA7718_ADDRESS, i2c_buff, 2);
+}
+
+ /*--------Functions for display data on TFT----------------*/
+/**---------------------------------------------------------**/
+void print_TDA_att_txt(SubNode_TDA *tmp)
+{
+    while(DMA1_Stream3->NDTR != 0){};
+
+    memcpy(tda_attenuation_txt, tmp->Name, 3);
+    
+    tda_attenuation_txt[9] =   (tmp->Value == 0) ? ' ' : (tmp->Value < 0 ? '-' : '+');
+    tda_attenuation_txt[10] = ((tmp->Value > 0) ? (tmp->Value / 10) : (-tmp->Value / 10)) + 0x30;
+    tda_attenuation_txt[11] = ((tmp->Value > 0) ? (tmp->Value-((tmp->Value/10)*10)) : (-tmp->Value-((-tmp->Value/10)*10))) + 0x30;
+    TFT_send(tda_attenuation_txt, sizeof(tda_attenuation_txt));
+}
+
+void print_TDA_txt(SubNode_TDA *tmp)
+{
+    while(DMA1_Stream3->NDTR != 0){};
+
+    memcpy(tda_c_f_h_q_txt, tmp->Name, 3);
+        
+    memcpy(&tda_c_f_h_q_txt[9], &tmp->TFT_buff[tmp->Value*4], 4);
+
+    TFT_send(tda_c_f_h_q_txt, sizeof(tda_c_f_h_q_txt));
+}
+
+ /*---------Display selected element on TFT-----------------*/
+/**---------------------------------------------------------**/
+void print_TDA_selet(SubList_TDA *list, SubNode_TDA *node)
+{
+    SubNode_TDA *tmp = list->head;
+    if(list->size == 2)
+    {
+        for(uint8_t i = 0;i<list->size;i++)
+        {
+            memcpy(&tda_select_2[i * 12], tmp->Name, 3);
+            tda_select_2[8 + (i * 12)] = 0 + 0x30;
+            tmp = tmp->next;
+        }
+        tda_select_2[8 + (node->ID * 12)] = 1 + 0x30;
+        TFT_send(tda_select_2, sizeof(tda_select_2));        
+    }
+    else if(list->size == 3)
+    {
+        for(uint8_t i = 0;i<list->size;i++)
+        {
+            memcpy(&tda_select_3[i * 12], tmp->Name, 3);
+            tda_select_3[8 + (i * 12)] = 0 + 0x30;
+            tmp = tmp->next;
+        }
+        tda_select_3[8 + (node->ID * 12)] = 1 + 0x30;
+        TFT_send(tda_select_3, sizeof(tda_select_3));        
+    }
+    else if(list->size == 6)
+    {
+        for(uint8_t i = 0;i<list->size;i++)
+        {
+            memcpy(&tda_select_6[i * 12], tmp->Name, 3);
+            tda_select_6[8 + (i * 12)] = 0 + 0x30;
+            tmp = tmp->next;
+        }
+        tda_select_6[8 + (node->ID * 12)] = 1 + 0x30;
+        TFT_send(tda_select_6, sizeof(tda_select_6));        
+    }
+}
+
+ /*----------------Chanch page on TFT-----------------------*/
+/**---------------------------------------------------------**/
+void print_TDA_selet_page(Node_TDA *tmp)
+{
+    memcpy(&tda_select_page[5], tmp->Name, 8);
+    
+    TFT_send(tda_select_page, sizeof(tda_select_page));
+}
+
 /**=========================================================**/
  /*-----------Init Timer for key----------------------------*/
 /**---------------------------------------------------------**/
@@ -1702,7 +1641,7 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
                 
                 current_time = current_time->next;
                 tmp_date |=  (current_time->Value/10 << RTC_DR_YT_Pos) | 
-                            ((current_time->Value  - ((current_time->Value/10)*10)) << RTC_DR_MU_Pos);
+                            ((current_time->Value  - ((current_time->Value/10)*10)) << RTC_DR_YU_Pos);
                             
                 current_time = current_time->next;
                 tmp_date |=  current_time->Value << RTC_DR_WDU_Pos;
@@ -1801,22 +1740,31 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
         {
             case GLOBAL_STATE_MAIN:
             {
-                
+                if(VOLUME < 23)
+                {
+                    VOLUME++;
+                    TFT_send_vol();
+                }
+
                 break;
             }
             case GLOBAL_STATE_SET_TIME:
             {
                 if(current_time->Value < current_time->MAX_value)
+                {
                     current_time->Value++;
-                current_time->Send_to_TFT_fnc(current_time);
+                    current_time->Send_to_TFT_fnc(current_time);
+                }
                 break;
             }
             case GLOBAL_STATE_TDA_SETT:
             {
                 if(current_SubTDA->Value < current_SubTDA->MAX_value)
+                {
                     current_SubTDA->Value++;
-                current_TDA->SubList->I2C_send_fnc(current_TDA->SubList);
-                current_SubTDA->Send_TFT_txt_fnc(current_SubTDA);
+                    current_TDA->SubList->I2C_send_fnc(current_TDA->SubList, current_SubTDA);
+                    current_SubTDA->Send_TFT_txt_fnc(current_SubTDA);
+                }
                 break;
             }
         }
@@ -1829,21 +1777,30 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
         {
             case GLOBAL_STATE_MAIN:
             {
+                if(VOLUME > -31)
+                {
+                    VOLUME--;
+                    TFT_send_vol();
+                }
                 break;
             }
             case GLOBAL_STATE_SET_TIME:
             {
                 if(current_time->Value > current_time->MIN_value)
+                {
                     current_time->Value--;
-                current_time->Send_to_TFT_fnc(current_time);
+                    current_time->Send_to_TFT_fnc(current_time);
+                }
                 break;
             }
             case GLOBAL_STATE_TDA_SETT:
             {
                 if(current_SubTDA->Value > current_SubTDA->MIN_value)
+                {
                     current_SubTDA->Value--;
-                current_TDA->SubList->I2C_send_fnc(current_TDA->SubList);
-                current_SubTDA->Send_TFT_txt_fnc(current_SubTDA);
+                    current_TDA->SubList->I2C_send_fnc(current_TDA->SubList, current_SubTDA);
+                    current_SubTDA->Send_TFT_txt_fnc(current_SubTDA);
+                }
                 break;
             }
         }
@@ -2054,8 +2011,8 @@ void TFT_switch_audio_input(void)
 
 void TFT_send_vol(void)
 {
-    main_VOL_text[9] =   VOLUME > 0 ? '+' : '-';
+    main_VOL_text[9] =   VOLUME == 0 ? ' ' : (VOLUME > 0 ? '+' : '-');
     main_VOL_text[10] = (VOLUME > 0 ? VOLUME/10 : -VOLUME/10) + 0x30;
     main_VOL_text[11] = (VOLUME > 0 ? (VOLUME-(VOLUME/10)*10) : (-VOLUME-(-VOLUME/10)*10)) + 0x30;
-    TFT_send(main_VOL_text, sizeof(main_VOL_text));     
+    TFT_send(main_VOL_text, sizeof(main_VOL_text));
 }

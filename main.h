@@ -29,6 +29,13 @@
 #define SysTicksClk 10000
 #define SysTicks    F_CPU/SysTicksClk
 
+enum PINs
+{
+    PIN0=0, PIN1,   PIN2,   PIN3,
+    PIN4,   PIN5,   PIN6,   PIN7,
+    PIN8,   PIN9,   PIN10,  PIN11,
+    PIN12,  PIN13,  PIN14,  PIN15
+};
 /*-------------------------------------------------------*/
 /*                  Memory Addresses                     */
 #define	MEM_ADDRESS 		0x0800C000
@@ -38,14 +45,6 @@
 #define TDA_MIDD_ADR	    MEM_ADDRESS + 0x18
 #define TDA_BASS_ADR	    MEM_ADDRESS + 0x1C
 #define TDA_SATT_ADR	    MEM_ADDRESS + 0x20
-
-enum PINs
-{
-    PIN0=0, PIN1,   PIN2,   PIN3,
-    PIN4,   PIN5,   PIN6,   PIN7,
-    PIN8,   PIN9,   PIN10,  PIN11,
-    PIN12,  PIN13,  PIN14,  PIN15
-};
 
 /*-------------------------------------------------------*/
 /*                  GPIO DEFINEs                         */
@@ -314,6 +313,124 @@ uint8_t day_of_week[7][9] = {" MONDAY  ",
 List_time *date_List;
 Node_time *current_time;
 
+/*-------------------------------------------------------*/
+/*                  TDA list's                           */
+typedef struct _SubNode_TDA
+{
+    char Name[3];
+    int8_t Value;
+    int8_t MIN_value;
+    int8_t MAX_value;
+    uint8_t Pos;
+    uint8_t ID;
+    void (*Send_TFT_txt_fnc)();
+    uint8_t *TFT_buff;
+    void (*Send_select_TFT_fnc)();
+    struct _SubNode_TDA *next;
+    struct _SubNode_TDA *prev;
+} SubNode_TDA;
+
+typedef struct _SubList_TDA
+{
+    uint8_t size;
+    uint8_t I2C_sub_address;
+    uint8_t (*I2C_send_fnc)();
+    SubNode_TDA *head;
+    SubNode_TDA *tail;
+} SubList_TDA;
+
+SubList_TDA* createSubList_TDA(uint8_t (*i2c_send_fnc)(), uint8_t i2c_sub_address);
+void pushBack_SubTDA(SubList_TDA *list, char *name, int8_t value, int8_t min_value, int8_t max_value, uint8_t pos, void (*send_TFT_txt_fnc)(), uint8_t *tft_buff, void (*send_select_TFT_fnc)());
+
+typedef struct _Node_TDA
+{
+    char Name[8];
+    uint8_t ID;
+    SubList_TDA *SubList;
+    void (*Select_TFT_page_fnc)();
+    struct _Node_TDA *next;
+} Node_TDA;
+
+typedef struct _List_TDA
+{
+    uint8_t size;
+    Node_TDA *head;
+    Node_TDA *tail;
+} List_TDA;
+
+List_TDA* createList_TDA(void);
+void pushBack_TDA(List_TDA *list, char *name, SubList_TDA *subList, void (*select_TFT_page_fnc)());
+
+uint8_t I2C_send_Loudness(SubList_TDA *tmp);
+uint8_t I2C_send_Trebl_Mid_Bass(SubList_TDA *tmp);
+uint8_t I2C_send_Sub_Mid_Bass(SubList_TDA *tmp);
+uint8_t I2C_send_Speaker_Attenuation(SubList_TDA *list, SubNode_TDA *node);
+
+uint8_t tda_attenuation_txt[16] = {'a','t','t','.','t','x','t','=','"','-','_','_','"',255,255,255};
+uint8_t tda_c_f_h_q_txt[17] = {'c','_','f','.','t','x','t','=','"','_','_','_','_','"',255,255,255};
+
+uint8_t loudness_cent_freq[4][4] = {{'F','L','A','T'},\
+                                    {' ','4','0','0'},\
+                                    {' ','8','0','0'},\
+                                    {'2','4','0','0'}};
+uint8_t loudness_high_boost[2][4]= {{' ','O','N',' '},\
+                                    {'O','F','F',' '}};
+
+uint8_t treble_cent_freq[4][4] = {{'1','0','.','0'},\
+                                  {'1','2','.','5'},\
+                                  {'1','5','.','0'},\
+                                  {'1','7','.','5'}};
+
+uint8_t middle_q_factor[3][4] = {{'1','.','0',' '},\
+                                 {'1','.','2','5'},\
+                                 {'2','.','0',' '}};
+
+uint8_t  bass_q_factor[4][4] = {{'1','.','0',' '},\
+                                {'1','.','2','5'},\
+                                {'1','.','5',' '},\
+                                {'2','.','0',' '}};
+
+uint8_t  sub_cut_off_freq[4][4] = {{' ','5','5',' '},\
+                                   {' ','8','5',' '},\
+                                   {'1','2','0',' '},\
+                                   {'1','6','0',' '}};
+
+uint8_t  middle_cent_freq[4][4] = {{' ','5','0','0'},\
+                                   {'1','0','0','0'},\
+                                   {'1','5','0','0'},\
+                                   {'2','5','0','0'}};
+
+ uint8_t  bass_cent_freq[4][4] = {{'0','6','0',' '},\
+                                  {'0','8','0',' '},\
+                                  {'1','0','0',' '},\
+                                  {'2','0','0',' '}};
+ 
+void print_TDA_att_txt(SubNode_TDA *tmp);
+void print_TDA_txt(SubNode_TDA *tmp);
+ 
+uint8_t tda_select_2[24] = {'_','_','_','.','v','a','l','=','0',255,255,255,\
+                            '_','_','_','.','v','a','l','=','0',255,255,255};
+uint8_t tda_select_3[36] = {'_','_','_','.','v','a','l','=','0',255,255,255,\
+                            '_','_','_','.','v','a','l','=','0',255,255,255,\
+                            '_','_','_','.','v','a','l','=','0',255,255,255};
+uint8_t tda_select_6[72] = {'_','_','_','.','v','a','l','=','0',255,255,255,\
+                            '_','_','_','.','v','a','l','=','0',255,255,255,\
+                            '_','_','_','.','v','a','l','=','0',255,255,255,\
+                            '_','_','_','.','v','a','l','=','0',255,255,255,\
+                            '_','_','_','.','v','a','l','=','0',255,255,255,\
+                            '_','_','_','.','v','a','l','=','0',255,255,255};
+
+void print_TDA_selet(SubList_TDA *list, SubNode_TDA *node);
+                            
+uint8_t tda_select_page[16] = {'p','a','g','e',' ','_','_','_','_','_','_','_','_',255,255,255};
+
+void print_TDA_selet_page(Node_TDA *tmp);
+
+SubList_TDA *SubList_TDA_Loudness, *SubList_TDA_Treble, *SubList_TDA_Middle, *SubList_TDA_Bass, *SubList_TDA_Sub_Mid_Bass, *SubList_TDA_Speaker_Att;
+List_TDA *List_TDA7718;
+Node_TDA *current_TDA;
+SubNode_TDA *current_SubTDA;
+                             
 /*-------------------------------------------------------*/
 /*                  Global functions prototypes          */
 /*--                Interrupts Handlers                --*/
