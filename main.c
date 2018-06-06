@@ -71,84 +71,36 @@ int main(void)
     }
     
     Init_I2C1();                            //I2C for TDA & TEA
-        
-    uint32_t tmp_mem;
-    tmp_mem = flash_read(MEM_ADDRESS);
-    if(tmp_mem != 0xFFFFFFFF)
-    {
-        GLOBAL_STATE = (0xFF000000 & tmp_mem) >> 24;
-        if((GLOBAL_STATE != GLOBAL_STATE_AUDIO_OFF) && (GLOBAL_STATE != GLOBAL_STATE_MAIN))
-            GLOBAL_STATE = GLOBAL_STATE_AUDIO_OFF;
-        AUDIO_INPUT = (0xFF0000 & flash_read(MEM_ADDRESS)) >> 16;
-        if(AUDIO_INPUT > AUDIO_AUX)
-           AUDIO_INPUT = AUDIO_FM; 
-        VOLUME = (0xFF00 & flash_read(MEM_ADDRESS)) >> 8;
-    }
-    else
+
+    GLOBAL_STATE = flash_read(GLOBAL_STATE_Mem_Add);
+    if((GLOBAL_STATE == 0xFF) || (GLOBAL_STATE != GLOBAL_STATE_MAIN) || (GLOBAL_STATE != GLOBAL_STATE_AUDIO_OFF))
     {
 #ifdef DEBUG
         GLOBAL_STATE = GLOBAL_STATE_MAIN;
 #else        
         GLOBAL_STATE = GLOBAL_STATE_AUDIO_OFF;
 #endif
+    }
+    
+    AUDIO_INPUT = flash_read(AUDIO_INPUT_Mem_Add);
+    if((AUDIO_INPUT == 0xFF) || (AUDIO_INPUT > AUDIO_AUX))
+    {
         AUDIO_INPUT = AUDIO_BT;
+    }
+    
+    VOLUME = flash_read(VOLUME_Mem_Add) - 31;
+    if((VOLUME > 23) || (VOLUME < -31))
+    {
         VOLUME = 0;
     }
-    TFT_send(pages[GLOBAL_STATE], sizeof(pages[GLOBAL_STATE]));
     
-    tmp_mem = flash_read(RADIO_FREQ_ADR);
-    if(tmp_mem != 0xFFFFFFFF) 
-    {    
-        RADIO_FREQ = (0xFFFF0000 & tmp_mem) >> 16;
-        if((RADIO_FREQ > 1080) && (RADIO_FREQ < 880))
-            RADIO_FREQ = 1040;
-    }
-    else
-        RADIO_FREQ = 1040;
-    
-//        tmp_mem = flash_read(TDA_MAIN_LOUD_ADR);
-//        TDA_loudness.high_boost  = (0xFF000000 & tmp_mem) >> 24;
-//        TDA_loudness.center_freq = (0xFF0000   & tmp_mem) >> 16;
-//        TDA_loudness.atteniation = (0xFF00     & tmp_mem) >> 8;
-//        
-//        tmp_mem = flash_read(TDA_TREB_ADR);
-//        TDA_treble.center_freq = (0xFF000000 & tmp_mem) >> 24;
-//        TDA_treble.atteniation = (0xFF0000   & tmp_mem) >> 16;
-//        
-//        tmp_mem = flash_read(TDA_MIDD_ADR);
-//        TDA_middle.Q_factot    = (0xFF000000 & tmp_mem) >> 24;
-//        TDA_middle.center_freq = (0xFF0000   & tmp_mem) >> 16;
-//        TDA_middle.atteniation = (0xFF00     & tmp_mem) >> 8;
-//        
-//        tmp_mem = flash_read(TDA_BASS_ADR);
-//        TDA_bass.Q_factot    = (0xFF000000 & tmp_mem) >> 24;
-//        TDA_bass.center_freq = (0xFF0000   & tmp_mem) >> 16;
-//        TDA_bass.atteniation = (0xFF00     & tmp_mem) >> 8;
-//        
-//        tmp_mem = flash_read(TDA_SATT_ADR);
-//        TDA_sp_att.left_front  = (0xFF000000 & tmp_mem) >> 24;
-//        TDA_sp_att.right_front = (0xFF0000   & tmp_mem) >> 16;
-//        TDA_sp_att.left_rear   = (0xFF00     & tmp_mem) >> 8;
-//        TDA_sp_att.right_rear  = (0xFF       & tmp_mem);
-    
-    I2C_res = Init_TDA();                   //TDA
-        
-    I2C_res = TEA_set_freq(RADIO_FREQ);     //FM
-    
-/**---------------------------------------------------------**/
- /*     Display on TFT                                      */
-    if(GLOBAL_STATE == GLOBAL_STATE_MAIN)
+    RADIO_FREQ  = flash_read(RADIO_FREQ_Mem_Add + 0x1);
+    RADIO_FREQ |= flash_read(RADIO_FREQ_Mem_Add) << 8;
+    if((RADIO_FREQ == 0xFF) || (RADIO_FREQ > 1090) || (RADIO_FREQ < 850))
     {
-        TFT_send(input_tft[AUDIO_INPUT], sizeof(input_tft[AUDIO_INPUT]));
-        
-        TFT_send_vol();
-        
-        TFT_switch_audio_input();
-        
-        AMP_ON;
-        UNMUTE;
+        RADIO_FREQ = 1040;
     }
-    
+
     date_List = createList_time();
     pushBack_time(date_List, "t_h", 0,  0, 23, print_set_time_txt, print_set_time_selet);
     pushBack_time(date_List, "t_m", 0,  0, 59, print_set_time_txt, print_set_time_selet);
@@ -158,27 +110,85 @@ int main(void)
     pushBack_time(date_List, "d_w", 1,  1,  7, print_set_time_txt, print_set_time_selet);
     
 
+    uint8_t tda_tmp_data;
+    SubNode_TDA *sub_node_tmp;
+    
     SubList_TDA_Loudness = createSubList_TDA(&I2C_send_Loudness, TDA_LOUDNESS);
     pushBack_SubTDA(SubList_TDA_Loudness, "att", -14, -15, 0, 0, print_TDA_att_txt, NULL, print_TDA_selet);
     pushBack_SubTDA(SubList_TDA_Loudness, "c_f",   3,   0, 3, 4, print_TDA_txt, loudness_cent_freq[0], print_TDA_selet);
     pushBack_SubTDA(SubList_TDA_Loudness, "h_q",   1,   0, 1, 6, print_TDA_txt, loudness_high_boost[0], print_TDA_selet);
+    sub_node_tmp = SubList_TDA_Loudness->head;
+    tda_tmp_data = flash_read(TDA_LOUD_ATT_Mem_Add);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
+    
+    sub_node_tmp = sub_node_tmp->next;
+    tda_tmp_data = flash_read(TDA_LOUD_C_F_Mem_Add);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
+
+    sub_node_tmp = sub_node_tmp->next;
+    tda_tmp_data = flash_read(TDA_LOUD_H_Q_Mem_Add);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
 
     SubList_TDA_Treble = createSubList_TDA(&I2C_send_Trebl_Mid_Bass, TDA_TREBLE_FILTER);
     pushBack_SubTDA(SubList_TDA_Treble, "att", 1, -15, 15, 0, print_TDA_att_txt, NULL, print_TDA_selet);
     pushBack_SubTDA(SubList_TDA_Treble, "c_f", 3,   0,  3, 5, print_TDA_txt, treble_cent_freq[0], print_TDA_selet);
- 
+    sub_node_tmp = SubList_TDA_Treble->head;
+    tda_tmp_data = flash_read(TDA_TREB_ATT_Mem_Add);
+     if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
+
+     sub_node_tmp = sub_node_tmp->next;
+    tda_tmp_data = flash_read(TDA_TREB_C_F_Mem_Add);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
+     
     SubList_TDA_Middle = createSubList_TDA(&I2C_send_Trebl_Mid_Bass, TDA_MIDDLE_FILTER);
     pushBack_SubTDA(SubList_TDA_Middle, "att", 1, -15, 15, 0, print_TDA_att_txt, NULL, print_TDA_selet);
     pushBack_SubTDA(SubList_TDA_Middle, "h_q", 2,   0,  2, 5, print_TDA_txt, middle_q_factor[0], print_TDA_selet);
+    sub_node_tmp = SubList_TDA_Middle->head;
+    tda_tmp_data = flash_read(TDA_MIDD_ATT_Mem_Add);
+     if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
+
+     sub_node_tmp = sub_node_tmp->next;
+    tda_tmp_data = flash_read(TDA_MIDD_Q_F_Mem_Add);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;   
 
     SubList_TDA_Bass = createSubList_TDA(&I2C_send_Trebl_Mid_Bass, TDA_BASS_FILTER);
     pushBack_SubTDA(SubList_TDA_Bass, "att", 1, -15, 15, 0, print_TDA_att_txt, NULL, print_TDA_selet);
     pushBack_SubTDA(SubList_TDA_Bass, "h_q", 3,   0,  3, 5, print_TDA_txt, bass_q_factor[0], print_TDA_selet);
+    sub_node_tmp = SubList_TDA_Bass->head;
+    tda_tmp_data = flash_read(TDA_BASS_ATT_Mem_Add);
+     if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
+
+     sub_node_tmp = sub_node_tmp->next;
+    tda_tmp_data = flash_read(TDA_BASS_Q_F_Mem_Add);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
     
     SubList_TDA_Sub_Mid_Bass = createSubList_TDA(&I2C_send_Sub_Mid_Bass, TDA_SUB_M_B);
     pushBack_SubTDA(SubList_TDA_Sub_Mid_Bass, "sco", 2, 0, 3, 0, print_TDA_txt, sub_cut_off_freq[0], print_TDA_selet);
     pushBack_SubTDA(SubList_TDA_Sub_Mid_Bass, "mcf", 3, 0, 3, 3, print_TDA_txt, middle_cent_freq[0], print_TDA_selet);
     pushBack_SubTDA(SubList_TDA_Sub_Mid_Bass, "bcf", 3, 0, 3, 5, print_TDA_txt, bass_cent_freq[0], print_TDA_selet);
+    sub_node_tmp = SubList_TDA_Sub_Mid_Bass->head;
+    tda_tmp_data = flash_read(TDA_SUBW_C_O_Mem_Add);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
+    
+    sub_node_tmp = sub_node_tmp->next;
+    tda_tmp_data = flash_read(TDA_MIDD_C_F_Mem_Add);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
+
+    sub_node_tmp = sub_node_tmp->next;
+    tda_tmp_data = flash_read(TDA_BASS_C_F_Mem_Add);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
     
     SubList_TDA_Speaker_Att = createSubList_TDA(&I2C_send_Speaker_Attenuation, TDA_SPEAKER_ATT_FL);
     pushBack_SubTDA(SubList_TDA_Speaker_Att, "f_l", 0, -79, 15, 0, print_TDA_att_txt, NULL, print_TDA_selet);
@@ -187,7 +197,35 @@ int main(void)
     pushBack_SubTDA(SubList_TDA_Speaker_Att, "r_r", 0, -79, 15, 3, print_TDA_att_txt, NULL, print_TDA_selet);
     pushBack_SubTDA(SubList_TDA_Speaker_Att, "swl", 0, -79, 15, 4, print_TDA_att_txt, NULL, print_TDA_selet);
     pushBack_SubTDA(SubList_TDA_Speaker_Att, "swr", 0, -79, 15, 5, print_TDA_att_txt, NULL, print_TDA_selet);
+    sub_node_tmp = SubList_TDA_Speaker_Att->head;
+    tda_tmp_data = flash_read(TDA_SP_ATT_F_L);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
     
+    sub_node_tmp = sub_node_tmp->next;
+    tda_tmp_data = flash_read(TDA_SP_ATT_F_R);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
+
+    sub_node_tmp = sub_node_tmp->next;
+    tda_tmp_data = flash_read(TDA_SP_ATT_R_L);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
+    
+    sub_node_tmp = sub_node_tmp->next;
+    tda_tmp_data = flash_read(TDA_SP_ATT_R_R);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
+    
+    sub_node_tmp = sub_node_tmp->next;
+    tda_tmp_data = flash_read(TDA_SP_ATT_SWL);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
+    
+    sub_node_tmp = sub_node_tmp->next;
+    tda_tmp_data = flash_read(TDA_SP_ATT_SWR);
+    if((tda_tmp_data != 0xFF) && ((int8_t)tda_tmp_data >= sub_node_tmp->MIN_value) && ((int8_t)tda_tmp_data <= sub_node_tmp->MAX_value))
+        sub_node_tmp->Value = (int8_t)tda_tmp_data;
     
     List_TDA7718 = createList_TDA();
     pushBack_TDA(List_TDA7718, "tda_loud", SubList_TDA_Loudness,     print_TDA_selet_page);
@@ -200,6 +238,27 @@ int main(void)
     current_TDA = List_TDA7718->head;
     current_SubTDA = current_TDA->SubList->head;
     
+    I2C_res = Init_TDA();                   //TDA
+        
+    I2C_res = TEA_set_freq(RADIO_FREQ);     //FM
+    
+/**---------------------------------------------------------**/
+ /*     Display on TFT                                      */
+ 
+    TFT_send(pages[GLOBAL_STATE], sizeof(pages[GLOBAL_STATE]));
+    
+    if(GLOBAL_STATE == GLOBAL_STATE_MAIN)
+    {
+        TFT_send(input_tft[AUDIO_INPUT], sizeof(input_tft[AUDIO_INPUT]));
+        
+        TFT_send_vol();
+        
+        TFT_switch_audio_input();
+        
+        AMP_ON;
+        UNMUTE;
+    }
+ 
     Init_KEYs_TIM();
 
     
@@ -963,19 +1022,6 @@ uint8_t TEA_set_freq(uint16_t freq)
 /**---------------------------------------------------------**/
 uint8_t Init_TDA(void)
 {
-//	init_buff[1] = (STATE == MAIN) ? TDA_inputs[INPUT_SEL] : TDA_SOURCE_MUTE; // Main source = SE2(FM), gain = 0;
-//    init_buff[2] = (TDA_loudness.atteniation & 0xF)|((TDA_loudness.center_freq << 4) & 0x30)| ((TDA_loudness.high_boost << 6) & 0x40); // Loudless
-//    init_buff[3] = 0xC7; // CLK FM off, SM step 2.56, 0.96, I2C, off
-//    init_buff[4] = VOLUME > 0 ? VOLUME : 16-VOLUME; // VOLUME
-//    init_buff[5] = 0x80 | ((TDA_treble.center_freq << 5)&0x60) | (TDA_treble.atteniation > 0 ? (TDA_treble.atteniation | 0x10):(abs(TDA_treble.atteniation))); // Ref out ext + treble off;
-//    init_buff[6] = ((TDA_middle.Q_factot << 5) & 0x60) | ((TDA_middle.atteniation > 0 ? (TDA_middle.atteniation | 0x10):(abs(TDA_middle.atteniation))) & 0x1F); // mid off
-//    init_buff[7] = ((TDA_bass.Q_factot << 5) & 0x60) | ((TDA_bass.atteniation > 0 ? (TDA_bass.atteniation | 0x10):(abs(TDA_bass.atteniation))) & 0x1F); // bass off
-//    init_buff[9] = ((TDA_bass.center_freq << 4) & 0x30) | ((TDA_middle.center_freq << 2) & 0xC); // sub off all
-//    init_buff[11]= TDA_sp_att.left_front  > 0 ? TDA_sp_att.left_front  : 16-TDA_sp_att.left_front; //Lefr  Front
-//    init_buff[12]= TDA_sp_att.right_front > 0 ? TDA_sp_att.right_front : 16-TDA_sp_att.right_front;//Right Front
-//    init_buff[13]= TDA_sp_att.left_rear   > 0 ? TDA_sp_att.left_rear   : 16-TDA_sp_att.left_rear;  //Lefr  Rear
-//    init_buff[14]= TDA_sp_att.right_rear  > 0 ? TDA_sp_att.right_rear  : 16-TDA_sp_att.right_rear; //Right Rear
-
     uint8_t I2C_buff[2], res;
     I2C_buff[0] = TDA_MAIN_SOURCE;      //Addr  0: Main Selector
     I2C_buff[1] = (GLOBAL_STATE == GLOBAL_STATE_MAIN) ? TDA_inputs[AUDIO_INPUT] : TDA_SOURCE_MUTE;
@@ -985,53 +1031,35 @@ uint8_t Init_TDA(void)
     I2C_buff[1] = 0x1D;
     res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
 
-    I2C_buff[0] = 7;            //Addr  7: Loudness
-    I2C_buff[1] = 0x00;
-    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= SubList_TDA_Loudness->I2C_send_fnc(SubList_TDA_Loudness);
     
     I2C_buff[0] = TDA_VOLUME;            //Addr  8: Volume/Output gain
     I2C_buff[1] = VOLUME > 0 ? VOLUME : 32-VOLUME;
     res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
 
-    I2C_buff[0] = 9;            //Addr  9: Treble filter
-    I2C_buff[1] = 0x0F;
-    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= SubList_TDA_Treble->I2C_send_fnc(SubList_TDA_Treble);
 
-    I2C_buff[0] = 10;           //Addr 10: Middle filter
-    I2C_buff[1] = 0x0F;
-    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
-
-    I2C_buff[0] = 11;           //Addr 11: Bass filter
-    I2C_buff[1] = 0x0F;
-    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= SubList_TDA_Middle->I2C_send_fnc(SubList_TDA_Middle);
     
-    I2C_buff[0] = 12;           //Addr 12: Subwoofer/middle/bass
-    I2C_buff[1] = 0x00;
-    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= SubList_TDA_Bass->I2C_send_fnc(SubList_TDA_Bass);
     
-    I2C_buff[0] = 13;           //Addr 13: Speaker attenuation Front Lefr
-    I2C_buff[1] = 0x00;
-    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= SubList_TDA_Sub_Mid_Bass->I2C_send_fnc(SubList_TDA_Sub_Mid_Bass);
     
-    I2C_buff[0] = 14;           //Addr 14: Speaker attenuation Front Right
-    I2C_buff[1] = 0x00;
-    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    SubNode_TDA *tmp;
     
-    I2C_buff[0] = 15;           //Addr 15: Speaker attenuation Rear Lefr
-    I2C_buff[1] = 0x00;
-    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
-
-    I2C_buff[0] = 16;           //Addr 16: Speaker attenuation Rear Right
-    I2C_buff[1] = 0x00;
-    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    tmp =SubList_TDA_Speaker_Att->head;
     
-    I2C_buff[0] = 17;           //Addr 17: Speaker attenuation SW Lefr
-    I2C_buff[1] = 0x00;
-    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
-    
-    I2C_buff[0] = 18;           //Addr 18: Speaker attenuation SW Right
-    I2C_buff[1] = 0x00;
-    res |= I2C1_Send(TDA7718_ADDRESS, I2C_buff, sizeof(I2C_buff));
+    res |= SubList_TDA_Speaker_Att->I2C_send_fnc(SubList_TDA_Speaker_Att, tmp);
+    tmp = tmp->next;
+    res |= SubList_TDA_Speaker_Att->I2C_send_fnc(SubList_TDA_Speaker_Att, tmp);
+    tmp = tmp->next;
+    res |= SubList_TDA_Speaker_Att->I2C_send_fnc(SubList_TDA_Speaker_Att, tmp);
+    tmp = tmp->next;
+    res |= SubList_TDA_Speaker_Att->I2C_send_fnc(SubList_TDA_Speaker_Att, tmp);
+    tmp = tmp->next;
+    res |= SubList_TDA_Speaker_Att->I2C_send_fnc(SubList_TDA_Speaker_Att, tmp);
+    tmp = tmp->next;
+    res |= SubList_TDA_Speaker_Att->I2C_send_fnc(SubList_TDA_Speaker_Att, tmp);
    
     return res;
 }
@@ -1040,9 +1068,10 @@ uint8_t Init_TDA(void)
  /*-------------FLASH functions-----------------------------*/
  /*----------------FLASH read-------------------------------*/
 /**---------------------------------------------------------**/
-uint32_t flash_read(uint32_t address)
+uint8_t flash_read(uint32_t address)
 {
-	return (*(__IO uint32_t*) address);
+	//return (*(__IO uint32_t*) address);
+    return (*(__IO uint8_t*) address);
 }
  /*----------------FLASH ready-------------------------------*/
 /**---------------------------------------------------------**/
@@ -1069,15 +1098,15 @@ void flash_erase_sector(uint8_t sector)
 
  /*----------------FLASH write-------------------------------*/
 /**---------------------------------------------------------**/
-void flash_write(uint32_t address, uint32_t data)
+void flash_write(uint32_t address, uint8_t data)
 {
 		FLASH->CR |= FLASH_CR_PG; //Разрешаем программирование флеша
 		
-		FLASH->CR |= FLASH_CR_PSIZE_1;
+		//FLASH->CR |= FLASH_CR_PSIZE_1;
 		
 		while(!flash_ready()); //Ожидаем готовности флеша к записи
 		
-		*(__IO uint32_t*)address = (uint32_t)data; //Пишем младшие 2 бата
+        *(__IO uint8_t*)address = (uint8_t)data;
 		
 		while(!flash_ready());
 		
@@ -1086,37 +1115,82 @@ void flash_write(uint32_t address, uint32_t data)
 
  /*-----------FLASH write new data--------------------------*/
 /**---------------------------------------------------------**/
-void flash_write_newdata(void)
+void flash_write_newdata_main(void)
 {
-    uint32_t tmp_mem;
-    
-	flash_erase_sector(3); //start from 0x0800C000
+	flash_erase_sector(2);
 	if(GLOBAL_STATE == GLOBAL_STATE_TDA_SETT)
-        tmp_mem = (GLOBAL_STATE_MAIN << 24 )   | (AUDIO_INPUT << 16) | (0xFF00 & (VOLUME << 8 ));
+        flash_write(GLOBAL_STATE_Mem_Add, GLOBAL_STATE_MAIN);
     else
-        tmp_mem = (GLOBAL_STATE << 24 )  | (AUDIO_INPUT << 16) | (0xFF00 & (VOLUME << 8 ));
+        flash_write(GLOBAL_STATE_Mem_Add, GLOBAL_STATE);
     
-    flash_write(MEM_ADDRESS, tmp_mem);
+    flash_write(AUDIO_INPUT_Mem_Add, AUDIO_INPUT);
     
-    tmp_mem = RADIO_FREQ << 16;
-	flash_write(RADIO_FREQ_ADR, tmp_mem); //Radio Freq
+    flash_write(VOLUME_Mem_Add, VOLUME + 31);
     
-//    tmp_mem = (TDA_loudness.high_boost << 24) | (TDA_loudness.center_freq << 16) | (0xFF00 & (TDA_loudness.atteniation << 8));
-//    flash_write(TDA_MAIN_LOUD_ADR, tmp_mem); //Main loud
-//    
-//    tmp_mem = (TDA_treble.center_freq  << 24) | (0xFF0000 & (TDA_treble.atteniation   << 16));
-//    flash_write(TDA_TREB_ADR, tmp_mem); //Treble
-//    
-//    tmp_mem = (TDA_middle.Q_factot     << 24) | (TDA_middle.center_freq   << 16) | (0xFF00 & (TDA_middle.atteniation   << 8));
-//    flash_write(TDA_MIDD_ADR, tmp_mem); //Middle
-//    
-//    tmp_mem = (TDA_bass.Q_factot       << 24) | (TDA_bass.center_freq     << 16) | (0xFF00 & (TDA_bass.atteniation     << 8));
-//    flash_write(TDA_BASS_ADR, tmp_mem); //Bass
-//    
-//    tmp_mem = (0xFF000000 & (TDA_sp_att.left_front   << 24)) | (0xFF0000 & (TDA_sp_att.right_front   << 16)) | (0xFF00 & (TDA_sp_att.left_rear     << 8)) | (TDA_sp_att.right_rear & 0xFF);
-//    flash_write(TDA_SATT_ADR, tmp_mem); //Speaker attenuation
+    flash_write(RADIO_FREQ_Mem_Add,       RADIO_FREQ >> 8);
+    flash_write(RADIO_FREQ_Mem_Add + 0x1, RADIO_FREQ & 0xFF);
 }
 
+void flash_write_newdata_tda(void)
+{
+	flash_erase_sector(3);
+    SubNode_TDA *tmp;
+    
+    tmp = SubList_TDA_Loudness->head;
+    flash_write(TDA_LOUD_ATT_Mem_Add, tmp->Value);
+    
+    tmp = tmp->next;
+    flash_write(TDA_LOUD_C_F_Mem_Add, tmp->Value);
+    
+    tmp = tmp->next;
+    flash_write(TDA_LOUD_H_Q_Mem_Add, tmp->Value);
+    
+    tmp = SubList_TDA_Treble->head;
+    flash_write(TDA_TREB_ATT_Mem_Add, tmp->Value);
+    
+    tmp = tmp->next;
+    flash_write(TDA_TREB_C_F_Mem_Add, tmp->Value);
+    
+    tmp = SubList_TDA_Middle->head;
+    flash_write(TDA_MIDD_ATT_Mem_Add, tmp->Value);
+    
+    tmp = tmp->next;
+    flash_write(TDA_MIDD_Q_F_Mem_Add, tmp->Value);
+    
+    tmp = SubList_TDA_Bass->head;
+    flash_write(TDA_BASS_ATT_Mem_Add, tmp->Value);
+    
+    tmp = tmp->next;
+    flash_write(TDA_BASS_Q_F_Mem_Add, tmp->Value);
+    
+    tmp = SubList_TDA_Sub_Mid_Bass->head;
+    flash_write(TDA_SUBW_C_O_Mem_Add, tmp->Value);
+    
+    tmp = tmp->next;
+    flash_write(TDA_MIDD_C_F_Mem_Add, tmp->Value);
+    
+    tmp = tmp->next;
+    flash_write(TDA_BASS_C_F_Mem_Add, tmp->Value);
+    
+    tmp = SubList_TDA_Speaker_Att->head;
+    flash_write(TDA_SP_ATT_F_L, tmp->Value);
+    
+    tmp = tmp->next;
+    flash_write(TDA_SP_ATT_F_R, tmp->Value);
+    
+    tmp = tmp->next;
+    flash_write(TDA_SP_ATT_R_L, tmp->Value);
+
+    tmp = tmp->next;
+    flash_write(TDA_SP_ATT_R_R, tmp->Value);
+
+    tmp = tmp->next;
+    flash_write(TDA_SP_ATT_SWL, tmp->Value);
+
+    tmp = tmp->next;
+    flash_write(TDA_SP_ATT_SWR, tmp->Value);
+
+}
 /**=========================================================**/
  /*----------------ADC Init---------------------------------*/
 /**---------------------------------------------------------**/
@@ -1560,7 +1634,7 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
             
             GLOBAL_STATE = GLOBAL_STATE_AUDIO_OFF;
 						
-			flash_write_newdata();
+			flash_write_newdata_main();
             
             TFT_send(pages[GLOBAL_STATE], sizeof(pages[GLOBAL_STATE]));
 
@@ -1582,7 +1656,7 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
             }
             if((GLOBAL_STATE == GLOBAL_STATE_AUDIO_OFF) || (GLOBAL_STATE == GLOBAL_STATE_MAIN))
             {
-				flash_write_newdata();
+				flash_write_newdata_main();
             
                 TFT_send(pages[GLOBAL_STATE], sizeof(pages[GLOBAL_STATE]));
 
@@ -1666,6 +1740,7 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
             }
             case GLOBAL_STATE_TDA_SETT:
             {
+                flash_write_newdata_tda();
                 GLOBAL_STATE = GLOBAL_STATE_MAIN;
                 TFT_send(pages[GLOBAL_STATE], sizeof(pages[GLOBAL_STATE]));
                 break;
@@ -1743,9 +1818,14 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
                 if(VOLUME < 23)
                 {
                     VOLUME++;
+                    i2c_buff[0] = TDA_VOLUME;
+                    i2c_buff[1] = VOLUME > 0 ? VOLUME : 32-VOLUME;
+                    
+                    I2C_res = I2C1_Send(TDA7718_ADDRESS, i2c_buff, 2);
+                    
+                    flash_write_newdata_main();
                     TFT_send_vol();
                 }
-
                 break;
             }
             case GLOBAL_STATE_SET_TIME:
@@ -1780,6 +1860,13 @@ void TIM8_TRG_COM_TIM14_IRQHandler(void)
                 if(VOLUME > -31)
                 {
                     VOLUME--;
+                    i2c_buff[0] = TDA_VOLUME;
+                    i2c_buff[1] = VOLUME > 0 ? VOLUME : 32-VOLUME;
+                    
+                    I2C_res = I2C1_Send(TDA7718_ADDRESS, i2c_buff, 2);
+                    
+                    flash_write_newdata_main();
+                    
                     TFT_send_vol();
                 }
                 break;

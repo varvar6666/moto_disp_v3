@@ -1,6 +1,6 @@
 Dependencies for Project 'v3', Target 'Target 1': (DO NOT MODIFY !)
-F (.\main.c)(0x5B17AFE1)(--c99 -c --cpu Cortex-M4.fp -g -O0 --apcs=interwork --split_sections-I.\RTE\Device\STM32F405RGTx-I.\RTE\_Target_1-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.3.0\CMSIS\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\2.12.0\Drivers\CMSIS\Device\ST\STM32F4xx\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\2.12.0\Drivers\STM32F4xx_HAL_Driver\Inc-D__UVISION_VERSION="524" -D_RTE_ -DSTM32F405xx-o .\objects\main.o --omf_browse .\objects\main.crf --depend .\objects\main.d)
-I (main.h)(0x5B17ADE0)
+F (.\main.c)(0x5B17F6DD)(--c99 -c --cpu Cortex-M4.fp -g -O0 --apcs=interwork --split_sections-I.\RTE\Device\STM32F405RGTx-I.\RTE\_Target_1-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.3.0\CMSIS\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\2.12.0\Drivers\CMSIS\Device\ST\STM32F4xx\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\2.12.0\Drivers\STM32F4xx_HAL_Driver\Inc-D__UVISION_VERSION="524" -D_RTE_ -DSTM32F405xx-o .\objects\main.o --omf_browse .\objects\main.crf --depend .\objects\main.d)
+I (main.h)(0x5B17F182)
 I (C:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\2.12.0\Drivers\CMSIS\Device\ST\STM32F4xx\Include\stm32f405xx.h)(0x5A414CAE)
 I (C:\Keil_v5\ARM\PACK\ARM\CMSIS\5.3.0\CMSIS\Include\core_cm4.h)(0x5A8E6632)
 I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x588BC994)

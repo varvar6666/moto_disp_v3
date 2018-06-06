@@ -36,16 +36,56 @@ enum PINs
     PIN8,   PIN9,   PIN10,  PIN11,
     PIN12,  PIN13,  PIN14,  PIN15
 };
+
+/*--                Clock Inits                        --*/
+void Init_RCC(void);
+void SysTick_Handler(void);
+
+void Init_RTC(void);
+
+void Init_IWDG(void);
+void IWDG_res(void);
+
 /*-------------------------------------------------------*/
 /*                  Memory Addresses                     */
-#define	MEM_ADDRESS 		0x0800C000
-#define RADIO_FREQ_ADR	    MEM_ADDRESS + 0x04
-#define TDA_MAIN_LOUD_ADR	MEM_ADDRESS + 0x10
-#define TDA_TREB_ADR	    MEM_ADDRESS + 0x14
-#define TDA_MIDD_ADR	    MEM_ADDRESS + 0x18
-#define TDA_BASS_ADR	    MEM_ADDRESS + 0x1C
-#define TDA_SATT_ADR	    MEM_ADDRESS + 0x20
+#define	MEM_ADDRESS 		    0x08008000
 
+#define GLOBAL_STATE_Mem_Add    MEM_ADDRESS
+#define AUDIO_INPUT_Mem_Add     MEM_ADDRESS + 0x1
+#define VOLUME_Mem_Add          MEM_ADDRESS + 0x2
+#define RADIO_FREQ_Mem_Add      MEM_ADDRESS + 0x3
+
+#define TDA_SETTING_MEM_ADDRESS 0x0800C000
+
+#define TDA_LOUD_ATT_Mem_Add    TDA_SETTING_MEM_ADDRESS
+#define TDA_LOUD_C_F_Mem_Add    TDA_SETTING_MEM_ADDRESS + 0x1
+#define TDA_LOUD_H_Q_Mem_Add    TDA_SETTING_MEM_ADDRESS + 0x2
+#define TDA_TREB_ATT_Mem_Add    TDA_SETTING_MEM_ADDRESS + 0x3
+#define TDA_TREB_C_F_Mem_Add    TDA_SETTING_MEM_ADDRESS + 0x4
+#define TDA_MIDD_ATT_Mem_Add    TDA_SETTING_MEM_ADDRESS + 0x5
+#define TDA_MIDD_Q_F_Mem_Add    TDA_SETTING_MEM_ADDRESS + 0x6
+#define TDA_BASS_ATT_Mem_Add    TDA_SETTING_MEM_ADDRESS + 0x7
+#define TDA_BASS_Q_F_Mem_Add    TDA_SETTING_MEM_ADDRESS + 0x8
+#define TDA_SUBW_C_O_Mem_Add    TDA_SETTING_MEM_ADDRESS + 0x9
+#define TDA_MIDD_C_F_Mem_Add    TDA_SETTING_MEM_ADDRESS + 0xA
+#define TDA_BASS_C_F_Mem_Add    TDA_SETTING_MEM_ADDRESS + 0xB
+
+#define TDA_SP_ATT_MEM_ADDRESS  TDA_SETTING_MEM_ADDRESS + 0x10
+
+#define TDA_SP_ATT_F_L          TDA_SP_ATT_MEM_ADDRESS
+#define TDA_SP_ATT_F_R          TDA_SP_ATT_MEM_ADDRESS + 0x1
+#define TDA_SP_ATT_R_L          TDA_SP_ATT_MEM_ADDRESS + 0x2
+#define TDA_SP_ATT_R_R          TDA_SP_ATT_MEM_ADDRESS + 0x3
+#define TDA_SP_ATT_SWL          TDA_SP_ATT_MEM_ADDRESS + 0x4
+#define TDA_SP_ATT_SWR          TDA_SP_ATT_MEM_ADDRESS + 0x5
+
+/*--                Flash                              --*/
+uint8_t flash_read(uint32_t address);
+uint8_t flash_ready(void);
+void flash_erase_sector(uint8_t sector);
+void flash_write(uint32_t address, uint8_t data);
+void flash_write_newdata_main(void);
+void flash_write_newdata_tda(void);
 /*-------------------------------------------------------*/
 /*                  GPIO DEFINEs                         */
 #define AMP_ON          GPIOB->BSRR |= GPIO_BSRR_BR6
@@ -85,6 +125,8 @@ enum PINs
 
 #define LED4_ON         GPIOB->BSRR |= GPIO_BSRR_BS1
 #define LED4_OFF        GPIOB->BSRR |= GPIO_BSRR_BR1
+
+void Init_GPIO(void);
 
 /*-------------------------------------------------------*/
 /*                  Global states                        */
@@ -151,8 +193,11 @@ uint8_t AUDIO_INPUT;
 //                             FM,   BT,   USB,  AUX
 const uint8_t TDA_inputs[4] = {0x04, 0x01, 0x05, 0x00};
 
+uint8_t Init_TDA(void);
 
-
+void Init_I2C1(void);
+uint8_t I2C1_Send(uint8_t addres,uint8_t *buff, uint16_t size);
+uint8_t TEA_set_freq(uint16_t freq);
 /*-------------------------------------------------------*/
 /*                  TFT strings                          */
 uint8_t TFT_reset[7] = {'r','e','s','t',255,255,255};
@@ -173,7 +218,7 @@ uint8_t input_tft[4][32] = {{'i','n','p','.','t','x','t','=','"','F','M','"',255
                             {'i','n','p','.','t','x','t','=','"','U','S','B','"',255,255,255,'i','n','p','.','b','c','o','=','6','3','4','8','8',255,255,255},
                             {'i','n','p','.','t','x','t','=','"','A','U','X','"',255,255,255,'i','n','p','.','b','c','o','=','6','4','5','1','2',255,255,255},};
                                 
-uint8_t main_FM_text[22] = 	   {'t','e','x','t','.','t','x','t','=','"','0','0','0','.','0',' ','F','M','"',255,255,255};
+uint8_t main_FM_text[19] = 	   {'t','e','x','t','.','t','x','t','=','"','0','0','0','.','0','"',255,255,255};
 uint8_t main_BT_text[4][21] = {{'t','e','x','t','.','t','x','t','=','"',' ','N','O',' ','D','e','v','"',255,255,255},
 							   {'t','e','x','t','.','t','x','t','=','"','C','o','n','n','e','c','t','"',255,255,255},
 							   {'t','e','x','t','.','t','x','t','=','"',' ','P','L','A','Y',' ',' ','"',255,255,255},
@@ -193,6 +238,11 @@ uint8_t main_text_font_7[14] = {'t','e','x','t','.','f','o','n','t','=','7',255,
 	
 uint8_t ADC_text[25] = {'A','D','C','.','t','x','t','=','"','0','0','.','0','V',' ',' ',' ','0','0','0','%','"',255,255,255};
 
+void Init_TFT(void);
+void TFT_send(uint8_t *buff, uint8_t size);
+    
+void TFT_switch_audio_input(void);
+void TFT_send_vol(void);
 /*-------------------------------------------------------*/
 /*                  BlueTooth                            */
 #define BT_RX_BUFF_SIZE 20
@@ -217,6 +267,9 @@ enum BT_Statuses
     BT_PLAY,
     BT_PAUSE
 };
+
+void Init_BT(void);
+void BT_send(uint8_t query);
 
 uint8_t BT_Status = BT_NO_DEV;
 uint8_t bt_rx_buff[BT_RX_BUFF_SIZE];
@@ -260,6 +313,10 @@ struct TRACK_INFO
 uint8_t USB_command[4]  = {0x7E, 0x02, 0, 0xEF};
 uint8_t USB_command5[5] = {0x7E, 0x03, 0, 0, 0xEF};
 
+void Init_USB(void);
+uint8_t USB_send(uint8_t CMD);
+uint8_t USB_send_par(uint8_t CMD, uint8_t PAR);
+
 uint8_t usb_rx_buff[11];
 uint8_t usb_status = USB_PAUSE;
 uint8_t usb_play_mode  = 0;
@@ -267,6 +324,8 @@ uint8_t usb_play_mode  = 0;
 /*-------------------------------------------------------*/
 /*                  ADC BUFFER                           */
 #define ADC_BUF_NUM 2
+
+void Init_ADC(void);
 
 uint16_t ADC_Buff[ADC_BUF_NUM];
 
@@ -292,6 +351,9 @@ typedef struct _List_time
     Node_time *tail;
 } List_time;
 
+List_time* createList_time(void);
+void pushBack_time(List_time *list, char *name, uint8_t value, uint8_t min_value, uint8_t max_value, void (*send_to_TFT_fnc)(), void (*send_select_TFT_fnc)());
+
 uint8_t set_time_txt[15] = {'_','_','_','.','t','x','t','=','"','_','_','"',255,255,255};
 uint8_t set_time_d_w_txt[22] = {'d','_','w','.','t','x','t','=','"','_','_','_','_','_','_','_','_','_','"',255,255,255};
     
@@ -309,6 +371,9 @@ uint8_t day_of_week[7][9] = {" MONDAY  ",
                              " FRIDAY  ",
                              "SATURDAY ",
                              " SUNDAY  "};
+
+void print_set_time_txt(Node_time *tmp);
+void print_set_time_selet(Node_time *tmp);
 
 List_time *date_List;
 Node_time *current_time;
@@ -434,55 +499,7 @@ SubNode_TDA *current_SubTDA;
 /*-------------------------------------------------------*/
 /*                  Global functions prototypes          */
 /*--                Interrupts Handlers                --*/
-//void TIM8_TRG_COM_TIM14_IRQHandler(void);         //Button parse timer interrupt
-//void DMA1_Stream2_IRQHandler(void);
-void DMA2_Stream0_IRQHandler(void);
-void UART5_IRQHandler(void);                        //Recive information from BT
-void TIM4_IRQHandler(void);
-//void UART4_IRQHandler(void);
-void RTC_Alarm_IRQHandler(void);
 
-/*--                Clock Inits                        --*/
-void Init_RCC(void);
-void SysTick_Handler(void);
-
-/*--                Flash                              --*/
-uint32_t flash_read(uint32_t address);
-uint8_t flash_ready(void);
-void flash_erase_sector(uint8_t sector);
-void flash_write(uint32_t address, uint32_t data);
-void flash_write_newdata(void);
-	
-void Init_GPIO(void);
-void Init_RTC(void);
-
-void Init_TFT(void);
-void TFT_send(uint8_t *buff, uint8_t size);
 void Init_KEYs_TIM(void);
 
-void Init_BT(void);
-void BT_send(uint8_t query);
-
-void Init_USB(void);
-uint8_t USB_send(uint8_t CMD);
-uint8_t USB_send_par(uint8_t CMD, uint8_t PAR);
-
-void Init_I2C1(void);
-uint8_t I2C1_Send(uint8_t addres,uint8_t *buff, uint16_t size);
-uint8_t TEA_set_freq(uint16_t freq);
-                            
-uint8_t Init_TDA(void);
-
-void Init_ADC(void);
 void Init_Pulse_IN(void);
-
-List_time* createList_time(void);
-void pushBack_time(List_time *list, char *name, uint8_t value, uint8_t min_value, uint8_t max_value, void (*send_to_TFT_fnc)(), void (*send_select_TFT_fnc)());
-void print_set_time_txt(Node_time *tmp);
-void print_set_time_selet(Node_time *tmp);
-
-void TFT_switch_audio_input(void);
-void TFT_send_vol(void);
-
-void Init_IWDG(void);
-void IWDG_res(void);
