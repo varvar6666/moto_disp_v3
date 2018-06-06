@@ -28,20 +28,9 @@ Project File Date:  06/05/2018
 *** Using Compiler 'V5.06 update 4 (build 422)', folder: 'D:\Programs\Keil_v5\ARM\ARMCC\Bin'
 Build target 'Target 1'
 compiling main.c...
-main.c(159): warning:  #940-D: missing return statement at end of non-void function "I2C_send_Loudness" 
-  }
-main.c(172): warning:  #940-D: missing return statement at end of non-void function "I2C_send_Trebl_Mid_Bass" 
-  }
-main.c(188): warning:  #940-D: missing return statement at end of non-void function "I2C_send_Sub_Mid_Bass" 
-  }
-main.c(195): warning:  #940-D: missing return statement at end of non-void function "I2C_send_Speaker_Attenuation" 
-  }
-main.c(192): warning:  #177-D: variable "i2c_buff"  was declared but never referenced
-      uint8_t i2c_buff[2] = {tmp->I2C_sub_address + tmp->head->Pos, (tmp->head->Value > 0) ? (tmp->head->Value) : (16 - tmp->head->Value)};
-main.c: 5 warnings, 0 errors
 linking...
-Program Size: Code=11774 RO-data=430 RW-data=1020 ZI-data=2196  
-".\Objects\v3.axf" - 0 Error(s), 5 Warning(s).
+Program Size: Code=11762 RO-data=430 RW-data=1100 ZI-data=2196  
+".\Objects\v3.axf" - 0 Error(s), 0 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -53,25 +42,25 @@ Package Vendor: ARM
 
 Package Vendor: Keil
                 http://www.keil.com/pack/Keil.STM32F4xx_DFP.2.11.0.pack
-                Keil::Device:Startup:2.6.0
+                ::Device:STM32Cube Framework:1.0.0 (API)
                 STMicroelectronics STM32F4 Series Device Support, Drivers and Examples
-   * Component: Startup Version: 2.6.0
    * Component: STM32Cube Framework Version: 1.0.0
-   * Component: ADC Version: 1.6.0
-   * Component: Common Version: 1.6.0
+   * Component: Startup Version: 2.6.0
    * Component: Classic Version: 1.6.0
-   * Component: GPIO Version: 1.6.0
-   * Component: Flash Version: 1.6.0
    * Component: Cortex Version: 1.6.0
-   * Component: I2C Version: 1.6.0
-   * Component: DMA Version: 1.6.0
-   * Component: DAC Version: 1.6.0
-   * Component: PWR Version: 1.6.0
+   * Component: Common Version: 1.6.0
+   * Component: ADC Version: 1.6.0
    * Component: RTC Version: 1.6.0
-   * Component: UART Version: 1.6.0
+   * Component: Flash Version: 1.6.0
+   * Component: DMA Version: 1.6.0
+   * Component: I2C Version: 1.6.0
+   * Component: GPIO Version: 1.6.0
+   * Component: PWR Version: 1.6.0
+   * Component: DAC Version: 1.6.0
    * Component: RCC Version: 1.6.0
-   * Component: TIM Version: 1.6.0
    * Component: USART Version: 1.6.0
+   * Component: TIM Version: 1.6.0
+   * Component: UART Version: 1.6.0
 
 <h2>Collection of Component include folders:</h2>
   D:\projects\moto\keil\v3\RTE\Device\STM32F405RGTx
@@ -84,74 +73,74 @@ Package Vendor: Keil
 
    * Component: ARM::CMSIS:CORE:5.1.1
 
+   * Component: ::Device:STM32Cube Framework:1.0.0 (API)
+
    * Component: Keil::Device:Startup:2.6.0
+      Source file:   MDK\Device\Source\ARM\STM32F40xxx_41xxx_OPT.s
+      Source file:   MDK\Device\Source\ARM\STM32F4xx_OTP.s
       Include file:  Drivers\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h
       Source file:   Drivers\CMSIS\Device\ST\STM32F4xx\Source\Templates\arm\startup_stm32f405xx.s
-      Source file:   MDK\Device\Source\ARM\STM32F4xx_OTP.s
-      Source file:   MDK\Device\Source\ARM\STM32F40xxx_41xxx_OPT.s
       Source file:   Drivers\CMSIS\Device\ST\STM32F4xx\Source\Templates\system_stm32f4xx.c
 
-   * Component: ::Device:STM32Cube Framework:1.0.0 (API)
+   * Component: Keil::Device:STM32Cube Framework:Classic:1.6.0
+      Source file:   MDK\Templates\Src\stm32f4xx_hal_msp.c
+      Include file:  CMSIS\Driver\Config\RTE_Device.h
+      Include file:  MDK\Templates\Inc\stm32f4xx_it.h
+      Source file:   MDK\Templates\Src\stm32f4xx_it.c
+      Source file:   MDK\Templates\Src\main.c
+      Include file:  MDK\Templates\Inc\stm32f4xx_hal_conf.h
+      Include file:  MDK\Templates\Inc\main.h
+
+   * Component: Keil::Device:STM32Cube HAL:Cortex:1.6.0
+      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_cortex.c
+
+   * Component: Keil::Device:STM32Cube HAL:Common:1.6.0
+      Include file:  Drivers\STM32F4xx_HAL_Driver\Inc\stm32f4xx_hal.h
+      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal.c
 
    * Component: Keil::Device:STM32Cube HAL:ADC:1.6.0
       Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_adc.c
       Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_adc_ex.c
 
-   * Component: Keil::Device:STM32Cube HAL:Common:1.6.0
-      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal.c
-      Include file:  Drivers\STM32F4xx_HAL_Driver\Inc\stm32f4xx_hal.h
-
-   * Component: Keil::Device:STM32Cube Framework:Classic:1.6.0
-      Include file:  MDK\Templates\Inc\stm32f4xx_hal_conf.h
-      Include file:  MDK\Templates\Inc\stm32f4xx_it.h
-      Source file:   MDK\Templates\Src\stm32f4xx_hal_msp.c
-      Source file:   MDK\Templates\Src\stm32f4xx_it.c
-      Source file:   MDK\Templates\Src\main.c
-      Include file:  MDK\Templates\Inc\main.h
-      Include file:  CMSIS\Driver\Config\RTE_Device.h
-
-   * Component: Keil::Device:STM32Cube HAL:GPIO:1.6.0
-      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_gpio.c
+   * Component: Keil::Device:STM32Cube HAL:RTC:1.6.0
+      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_rtc.c
+      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_rtc_ex.c
 
    * Component: Keil::Device:STM32Cube HAL:Flash:1.6.0
       Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_flash.c
       Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_flash_ex.c
 
-   * Component: Keil::Device:STM32Cube HAL:Cortex:1.6.0
-      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_cortex.c
-
-   * Component: Keil::Device:STM32Cube HAL:I2C:1.6.0
-      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_i2c.c
-
    * Component: Keil::Device:STM32Cube HAL:DMA:1.6.0
       Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_dma_ex.c
       Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_dma.c
 
-   * Component: Keil::Device:STM32Cube HAL:DAC:1.6.0
-      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_dac.c
-      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_dac_ex.c
+   * Component: Keil::Device:STM32Cube HAL:I2C:1.6.0
+      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_i2c.c
+
+   * Component: Keil::Device:STM32Cube HAL:GPIO:1.6.0
+      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_gpio.c
 
    * Component: Keil::Device:STM32Cube HAL:PWR:1.6.0
       Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_pwr_ex.c
       Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_pwr.c
 
-   * Component: Keil::Device:STM32Cube HAL:RTC:1.6.0
-      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_rtc_ex.c
-      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_rtc.c
-
-   * Component: Keil::Device:STM32Cube HAL:UART:1.6.0
-      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_uart.c
+   * Component: Keil::Device:STM32Cube HAL:DAC:1.6.0
+      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_dac_ex.c
+      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_dac.c
 
    * Component: Keil::Device:STM32Cube HAL:RCC:1.6.0
       Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_rcc.c
       Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_rcc_ex.c
 
+   * Component: Keil::Device:STM32Cube HAL:USART:1.6.0
+      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_usart.c
+
    * Component: Keil::Device:STM32Cube HAL:TIM:1.6.0
       Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_tim.c
       Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_tim_ex.c
 
-   * Component: Keil::Device:STM32Cube HAL:USART:1.6.0
-      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_usart.c
+   * Component: Keil::Device:STM32Cube HAL:UART:1.6.0
+      Source file:   Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_uart.c
 Build Time Elapsed:  00:00:02
 </pre>
 </body>
