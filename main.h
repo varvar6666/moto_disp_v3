@@ -13,7 +13,8 @@
 
 /*-------------------------------------------------------*/
 /*                  Copmilator defs                      */
-#define DEBUG //RELEASE
+//#define RELEASE
+#define DEBUG 
 //#define DEBUG_BT
 //#define DEBUG_TFT
 
@@ -324,8 +325,11 @@ uint8_t usb_play_mode  = 0;
 /*-------------------------------------------------------*/
 /*                  ADC BUFFER                           */
 #define ADC_BUF_NUM 2
-
+#define ADC_FILTER_NUM 10
 void Init_ADC(void);
+
+uint16_t adc_filter_buff[ADC_BUF_NUM][ADC_FILTER_NUM];
+uint32_t adc_filterd[ADC_BUF_NUM];
 
 uint16_t ADC_Buff[ADC_BUF_NUM];
 

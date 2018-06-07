@@ -74,7 +74,7 @@ int main(void)
     Init_I2C1();                            //I2C for TDA & TEA
 
     GLOBAL_STATE = flash_read(GLOBAL_STATE_Mem_Add);
-    if((GLOBAL_STATE == 0xFF) || (GLOBAL_STATE != GLOBAL_STATE_MAIN) || (GLOBAL_STATE != GLOBAL_STATE_AUDIO_OFF))
+    if((GLOBAL_STATE == 0xFF) || ((GLOBAL_STATE != GLOBAL_STATE_MAIN) && (GLOBAL_STATE != GLOBAL_STATE_AUDIO_OFF)))
     {
 #ifdef DEBUG
         GLOBAL_STATE = GLOBAL_STATE_MAIN;
@@ -97,7 +97,7 @@ int main(void)
     
     RADIO_FREQ  = flash_read(RADIO_FREQ_Mem_Add + 0x1);
     RADIO_FREQ |= flash_read(RADIO_FREQ_Mem_Add) << 8;
-    if((RADIO_FREQ == 0xFF) || (RADIO_FREQ > 1090) || (RADIO_FREQ < 850))
+    if((RADIO_FREQ == 0xFF) || ((RADIO_FREQ > 1090) && (RADIO_FREQ < 850)))
     {
         RADIO_FREQ = 1040;
     }
@@ -262,11 +262,11 @@ int main(void)
  
     Init_KEYs_TIM();
 
-    
+#ifndef DEBUG_BT
     NVIC_EnableIRQ(RTC_Alarm_IRQn);
     NVIC_EnableIRQ(DMA2_Stream0_IRQn);
     NVIC_EnableIRQ(TIM8_TRG_COM_TIM14_IRQn);
-    
+#endif
 #ifdef DEBUG
     LED1_ON;
 #endif
@@ -573,7 +573,7 @@ void Init_TFT(void)
 #ifdef DEBUG_BT
 
     RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
-    USART3->BRR = APB1/921600;
+    USART3->BRR = APB1/115200;
     USART3->CR1 = USART_CR1_UE |
                   USART_CR1_TE |
                   USART_CR1_RE |
@@ -602,9 +602,7 @@ void Init_TFT(void)
 /**---------------------------------------------------------**/
 void TFT_send(uint8_t *buff, uint8_t size)
 {
-#ifdef DEBUG
-    LED2_ON;
-#endif
+#ifndef DEBUG_BT
     while(DMA1_Stream3->NDTR != 0){};
     while(!(USART3->SR & USART_SR_TC)){};
         
@@ -617,8 +615,6 @@ void TFT_send(uint8_t *buff, uint8_t size)
                   DMA_LIFCR_CFEIF3 |
                   DMA_LIFCR_CTEIF3;
     DMA1_Stream3->CR |= DMA_SxCR_EN;
-#ifdef DEBUG
-    LED2_OFF;
 #endif
 }
 
@@ -629,7 +625,7 @@ void Init_BT(void)
 {
 #ifdef DEBUG_BT
     RCC->APB1ENR |= RCC_APB1ENR_UART5EN;
-    UART5->BRR = APB1/921600;
+    UART5->BRR = APB1/115200;
     UART5->CR1 = USART_CR1_UE | 
                  USART_CR1_TE | 
                  USART_CR1_RE |
@@ -644,7 +640,7 @@ void Init_BT(void)
     
     //MX_USART3_UART_Init();
     RCC->APB1ENR |= RCC_APB1ENR_UART5EN;
-    UART5->BRR = APB1/921600;
+    UART5->BRR = APB1/115200;
     UART5->CR1 = USART_CR1_UE | 
                  USART_CR1_TE | 
                  USART_CR1_RE |
@@ -689,6 +685,7 @@ void BT_send(uint8_t query)
 
  /*----------Recive information about BT UART5-------------*/
 /**---------------------------------------------------------**/
+#ifndef DEBUG_BT
 void UART5_IRQHandler(void)
 {
 	if(UART5->SR & USART_SR_IDLE)
@@ -700,6 +697,7 @@ void UART5_IRQHandler(void)
 		DMA1_Stream0->CR &= ~DMA_SxCR_EN;
 	}
 }
+#endif
 
  /*--------------BT UART5 DMA recive Handler----------------*/
 /**---------------------------------------------------------**/
@@ -1092,9 +1090,10 @@ void flash_erase_sector(uint8_t sector)
 		FLASH->CR |= sector << FLASH_CR_SNB_Pos; // Задаем её адрес
 		FLASH->CR |= FLASH_CR_STRT; // Запускаем стирание
 		
-		while(!flash_ready())//Ждем пока страница сотрется.
+		while(!flash_ready()){};//Ждем пока страница сотрется.
 		
-		FLASH->CR&= ~(FLASH_CR_SER); //Сбрасываем бит обратно
+        FLASH->CR &= ~(FLASH_CR_SNB);
+		FLASH->CR &= ~(FLASH_CR_SER); //Сбрасываем бит обратно
 }
 
  /*----------------FLASH write-------------------------------*/
@@ -1105,7 +1104,7 @@ void flash_write(uint32_t address, uint8_t data)
 		
 		//FLASH->CR |= FLASH_CR_PSIZE_1;
 		
-		while(!flash_ready()); //Ожидаем готовности флеша к записи
+		while(!flash_ready()){}; //Ожидаем готовности флеша к записи
 		
         *(__IO uint8_t*)address = (uint8_t)data;
 		
@@ -1134,6 +1133,9 @@ void flash_write_newdata_main(void)
 
 void flash_write_newdata_tda(void)
 {
+#ifdef DEBUG
+    LED2_ON;
+#endif
 	flash_erase_sector(3);
     SubNode_TDA *tmp;
     
@@ -1190,7 +1192,9 @@ void flash_write_newdata_tda(void)
 
     tmp = tmp->next;
     flash_write(TDA_SP_ATT_SWR, tmp->Value);
-
+#ifdef DEBUG
+    LED2_OFF;
+#endif
 }
 /**=========================================================**/
  /*----------------ADC Init---------------------------------*/
@@ -1229,7 +1233,7 @@ void Init_ADC(void)
     //Timer 3s Init
     RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;//Timer for ADC
     TIM3->PSC = APB1_TIM/10000-1;
-    TIM3->ARR = 5000;
+    TIM3->ARR = 500;
     TIM3->CR2 |= TIM_CR2_MMS_1;
     TIM3->CR1 |= TIM_CR1_CEN;
 }
@@ -1246,8 +1250,28 @@ void DMA2_Stream0_IRQHandler(void)
                    DMA_LIFCR_CTEIF0 |
                    DMA_LIFCR_CHTIF0 |
                    DMA_LIFCR_CTCIF0;
-	uint8_t V_IN = (ADC_Buff[0]*182)/0xFFF; //182 = 3.64(Vref) * 5(devider on pcb) * 10(for calculations)
-	uint8_t P_IN = (ADC_Buff[1]*182)/0xFFF; //182 = 3.64(Vref) * 5(devider on pcb) * 10(for calculations)
+    
+    static uint8_t item;
+    
+    adc_filter_buff[0][item] = ADC_Buff[0];
+    adc_filter_buff[1][item] = ADC_Buff[1];
+    
+    adc_filterd[0] = 0;
+    adc_filterd[1] = 0;
+    
+    for(uint8_t j = 0;j<ADC_FILTER_NUM;j++)
+    {
+        adc_filterd[0] += adc_filter_buff[0][j];
+        adc_filterd[1] += adc_filter_buff[1][j];
+    }
+    adc_filterd[0] /= ADC_FILTER_NUM;
+    adc_filterd[1] /= ADC_FILTER_NUM;
+    
+    item++;
+    if(item == ADC_FILTER_NUM) item = 0;
+    
+	uint8_t V_IN = (adc_filterd[0]*182)/0xFFF; //182 = 3.64(Vref) * 5(devider on pcb) * 10(for calculations)
+	uint8_t P_IN = (adc_filterd[1]*182)/0xFFF; //182 = 3.64(Vref) * 5(devider on pcb) * 10(for calculations)
     
     ADC_text[9]  =  V_IN/100 + 0x30;
     ADC_text[10] = (V_IN -(V_IN/100)*100)/10 + 0x30;
