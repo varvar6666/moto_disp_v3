@@ -417,7 +417,7 @@ void Init_GPIO(void)
     GPIOB->MODER |= GPIO_MODE_AF_PP << PIN10*2 |
 					GPIO_MODE_AF_PP << PIN11*2;
 #endif
-             
+         
     //Set GPIOC PIN12 as usart5 TX & GPIOD PIN2 as usart5 RX <===> BT
     GPIOC->AFR[1] |= GPIO_AF8_UART5 << (PIN12*4-32);
     GPIOD->AFR[0] |= GPIO_AF8_UART5 <<  PIN2*4;
@@ -427,7 +427,7 @@ void Init_GPIO(void)
     GPIOD->OSPEEDR |= GPIO_SPEED_FREQ_VERY_HIGH << PIN2*2;
     GPIOC->MODER |= GPIO_MODE_AF_PP << PIN12*2;
     GPIOD->MODER |= GPIO_MODE_AF_PP << PIN2*2;
-		
+        
     //GPIOB PIN8,9 I2C1 
     GPIOB->AFR[1] |= GPIO_AF4_I2C1 << (PIN8*4-32) |
                      GPIO_AF4_I2C1 << (PIN9*4-32);
